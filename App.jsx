@@ -1,7 +1,7 @@
 import { useState, useMemo, createContext, useContext, useCallback, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend, ComposedChart } from "recharts";
 
-const APP_VERSION = "v2.3.0";
+const APP_VERSION = "v2.5.0";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const SUPPLIERS = [
@@ -274,15 +274,15 @@ const USERS = [
 ];
 
 const WAREHOUSE_DAILY_TASKS = [
-  { id:1, assignee:"Marc Bélanger", task:"Vérifier réceptions du matin", priority:"Haute", done:false },
-  { id:2, assignee:"Marc Bélanger", task:"Préparer PO-2026-0001 (Nano Bolt 305)", priority:"Haute", done:false },
-  { id:3, assignee:"Marc Bélanger", task:"Comptage allée B — articles classe A", priority:"Moyenne", done:false },
-  { id:4, assignee:"Sophie Gagnon", task:"Préparer PO-2026-0003 (Smart Label 218)", priority:"Haute", done:false },
-  { id:5, assignee:"Sophie Gagnon", task:"Ranger réception HydroTech SA", priority:"Moyenne", done:false },
-  { id:6, assignee:"Sophie Gagnon", task:"Inventaire tournant — Zone transit", priority:"Basse", done:false },
-  { id:7, assignee:"Luc Martineau", task:"Préparer PO-2026-0010 (Pro Gasket 456)", priority:"Haute", done:false },
-  { id:8, assignee:"Luc Martineau", task:"Consolidation palette secteur C", priority:"Moyenne", done:false },
-  { id:9, assignee:"Luc Martineau", task:"Nettoyage zone de quarantaine", priority:"Basse", done:false },
+  { id:1, assignee:"Marc Bélanger", task:"Réceptionner PO-2026-0001 (Nano Bolt 305)", priority:"Haute", done:false, action_type:"reception", po_ref:"PO-2026-0001" },
+  { id:2, assignee:"Marc Bélanger", task:"Picking PO-2026-0010 (Pro Gasket 456)", priority:"Haute", done:false, action_type:"picking", po_ref:"PO-2026-0010" },
+  { id:3, assignee:"Marc Bélanger", task:"Comptage allée B — articles classe A", priority:"Moyenne", done:false, action_type:"comptage", po_ref:null },
+  { id:4, assignee:"Sophie Gagnon", task:"Réceptionner PO-2026-0003 (Smart Label 218)", priority:"Haute", done:false, action_type:"reception", po_ref:"PO-2026-0003" },
+  { id:5, assignee:"Sophie Gagnon", task:"Ranger réception HydroTech SA", priority:"Moyenne", done:false, action_type:"rangement", po_ref:null },
+  { id:6, assignee:"Sophie Gagnon", task:"Inventaire tournant — Zone transit", priority:"Basse", done:false, action_type:"comptage", po_ref:null },
+  { id:7, assignee:"Luc Martineau", task:"Picking PO-2026-0010 (Pro Gasket 456)", priority:"Haute", done:false, action_type:"picking", po_ref:"PO-2026-0010" },
+  { id:8, assignee:"Luc Martineau", task:"Consolidation palette secteur C", priority:"Moyenne", done:false, action_type:null, po_ref:null },
+  { id:9, assignee:"Luc Martineau", task:"Nettoyage zone de quarantaine", priority:"Basse", done:false, action_type:null, po_ref:null },
 ];
 
 const AuthContext = createContext(null);
@@ -2410,16 +2410,17 @@ const LoginPage = ({ onLogin }) => {
 // ─── WAREHOUSE DASHBOARD ─────────────────────────────────────────────────────
 const WarehouseDashboard = () => {
   const COLORS = useTheme();
-  const { pos, counts } = useData();
+  const { pos, counts, dailyTasks, setDailyTasks, activityLog, completeDailyTask } = useData();
   const auth = useAuth();
-  const [dailyTasks, setDailyTasks] = useState(WAREHOUSE_DAILY_TASKS.filter(t => t.assignee === auth.user.nom));
 
+  const myTasks = dailyTasks.filter(t => t.assignee === auth.user.nom);
   const toggleTask = (id) => setDailyTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
 
   const myPOs = pos.filter(p => p.statut === "ENVOYE");
   const myCountsToday = counts.filter(c => c.compteur === auth.user.nom && c.date >= "2026-03-14").length;
-  const tasksCompleted = dailyTasks.filter(t => t.done).length;
+  const tasksCompleted = myTasks.filter(t => t.done).length;
   const priorityColors = { Haute: COLORS.danger, Moyenne: COLORS.warning, Basse: COLORS.info };
+  const myActivity = activityLog.filter(a => a.user === auth.user.nom).slice(0, 8);
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
@@ -2427,45 +2428,71 @@ const WarehouseDashboard = () => {
       <div style={{ background:`linear-gradient(135deg, ${COLORS.accent}15, ${COLORS.info}10)`, borderRadius:16, padding:"24px 28px", border:`1px solid ${COLORS.border}` }}>
         <div style={{ fontSize:22, fontWeight:700, color:COLORS.text, marginBottom:4 }}>Bonjour, {auth.user.nom.split(' ')[0]} 👋</div>
         <div style={{ fontSize:13, color:COLORS.textMuted }}>{auth.user.poste} — 18 mars 2026</div>
+        {tasksCompleted === myTasks.length && myTasks.length > 0 && (
+          <div style={{ marginTop:8, padding:"4px 14px", borderRadius:20, fontSize:11, fontWeight:600, background:`${COLORS.accent}20`, color:COLORS.accent, display:"inline-block" }}>🎉 Toutes les tâches complétées !</div>
+        )}
       </div>
 
       {/* KPIs */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:14 }}>
-        <KpiCard label="Mes tâches du jour" value={`${tasksCompleted}/${dailyTasks.length}`} sub="Complétées" color={tasksCompleted===dailyTasks.length?COLORS.accent:COLORS.warning}/>
+        <KpiCard label="Mes tâches du jour" value={`${tasksCompleted}/${myTasks.length}`} sub="Complétées" color={tasksCompleted===myTasks.length&&myTasks.length>0?COLORS.accent:COLORS.warning}/>
         <KpiCard label="Commandes à préparer" value={myPOs.length} sub="Statut ENVOYÉ" color={COLORS.info}/>
         <KpiCard label="Comptages effectués" value={myCountsToday} sub="Aujourd'hui" color={COLORS.accent}/>
-        <KpiCard label="Progression" value={`${dailyTasks.length>0?Math.round(tasksCompleted/dailyTasks.length*100):0}%`} color={tasksCompleted===dailyTasks.length?COLORS.accent:COLORS.warning}/>
+        <KpiCard label="Progression" value={`${myTasks.length>0?Math.round(tasksCompleted/myTasks.length*100):0}%`} color={tasksCompleted===myTasks.length&&myTasks.length>0?COLORS.accent:COLORS.warning}/>
       </div>
 
-      {/* Daily tasks */}
-      <Card title={`Mes tâches du jour — ${auth.user.nom}`}>
-        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-          {dailyTasks.length === 0 && <div style={{ padding:20, textAlign:"center", color:COLORS.textDim }}>Aucune tâche assignée</div>}
-          {dailyTasks.map(t => (
-            <div key={t.id} onClick={() => toggleTask(t.id)}
-              style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderRadius:10,
-                background: t.done ? `${COLORS.accent}08` : COLORS.surface,
-                border:`1px solid ${t.done ? COLORS.accentDim : COLORS.border}`,
-                cursor:"pointer", transition:"all 0.15s" }}>
-              <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${t.done?COLORS.accent:COLORS.textDim}`,
-                background:t.done?COLORS.accent:"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                {t.done && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        {/* Daily tasks */}
+        <Card title={`Mes tâches du jour (${tasksCompleted}/${myTasks.length})`}>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {myTasks.length === 0 && <div style={{ padding:20, textAlign:"center", color:COLORS.textDim }}>Aucune tâche assignée</div>}
+            {myTasks.map(t => (
+              <div key={t.id} onClick={() => toggleTask(t.id)}
+                style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderRadius:10,
+                  background: t.done ? `${COLORS.accent}08` : COLORS.surface,
+                  border:`1px solid ${t.done ? COLORS.accentDim : COLORS.border}`,
+                  cursor:"pointer", transition:"all 0.15s" }}>
+                <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${t.done?COLORS.accent:COLORS.textDim}`,
+                  background:t.done?COLORS.accent:"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  {t.done && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:500, color:t.done?COLORS.textDim:COLORS.text, textDecoration:t.done?"line-through":"none" }}>{t.task}</div>
+                  {t.completed_at && <div style={{ fontSize:10, color:COLORS.accent, marginTop:2 }}>✓ Complétée automatiquement</div>}
+                </div>
+                <span style={{ padding:"3px 10px", borderRadius:5, fontSize:10, fontWeight:600,
+                  background:`${priorityColors[t.priority]}15`, color:priorityColors[t.priority],
+                  border:`1px solid ${priorityColors[t.priority]}30` }}>{t.priority}</span>
               </div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:500, color:t.done?COLORS.textDim:COLORS.text, textDecoration:t.done?"line-through":"none" }}>{t.task}</div>
-              </div>
-              <span style={{ padding:"3px 10px", borderRadius:5, fontSize:10, fontWeight:600,
-                background:`${priorityColors[t.priority]}15`, color:priorityColors[t.priority],
-                border:`1px solid ${priorityColors[t.priority]}30` }}>{t.priority}</span>
-            </div>
-          ))}
-        </div>
-        {dailyTasks.length > 0 && (
-          <div style={{ marginTop:14, height:6, background:COLORS.bg, borderRadius:3, overflow:"hidden" }}>
-            <div style={{ width:`${dailyTasks.length>0?tasksCompleted/dailyTasks.length*100:0}%`, height:"100%", background:COLORS.accent, borderRadius:3, transition:"width 0.3s" }}/>
+            ))}
           </div>
-        )}
-      </Card>
+          {myTasks.length > 0 && (
+            <div style={{ marginTop:14, height:6, background:COLORS.bg, borderRadius:3, overflow:"hidden" }}>
+              <div style={{ width:`${myTasks.length>0?tasksCompleted/myTasks.length*100:0}%`, height:"100%", background:COLORS.accent, borderRadius:3, transition:"width 0.3s" }}/>
+            </div>
+          )}
+        </Card>
+
+        {/* Activity history */}
+        <Card title="Mes dernières actions">
+          {myActivity.length === 0 ? (
+            <div style={{ padding:20, textAlign:"center", color:COLORS.textDim }}>Aucune action enregistrée aujourd'hui</div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              {myActivity.map(a => (
+                <div key={a.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", borderRadius:8, background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+                  <div style={{ width:8, height:8, borderRadius:4, background:a.action==="Réception"?COLORS.accent:a.action==="Picking"?COLORS.info:a.action==="Rangement"?COLORS.warning:COLORS.purple, flexShrink:0 }}/>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:COLORS.text }}>{a.action}</div>
+                    <div style={{ fontSize:11, color:COLORS.textDim, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.details}</div>
+                  </div>
+                  <span style={{ fontSize:10, color:COLORS.textDim, flexShrink:0 }}>{a.time}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* Quick access: orders to prepare */}
       <Card title={`Commandes à préparer (${myPOs.length})`}>
@@ -2495,7 +2522,7 @@ const WarehouseDashboard = () => {
 // ─── WAREHOUSE ORDERS PAGE ───────────────────────────────────────────────────
 const WarehouseOrdersPage = () => {
   const COLORS = useTheme();
-  const { pos, addEvent, showToast, setPos, setTasks, tasks } = useData();
+  const { pos, addEvent, showToast, setPos, setTasks, tasks, completeDailyTask, addNotification, addActivity } = useData();
   const auth = useAuth();
   const [filter, setFilter] = useState("ENVOYE");
   const [search, setSearch] = useState("");
@@ -2578,6 +2605,9 @@ const WarehouseOrdersPage = () => {
     }
 
     showToast(`${po.po_number} réceptionné — ${qtyRecue} unités${hasProbleme ? " (problème signalé)" : ""}`);
+    completeDailyTask(po.po_number, "reception");
+    addNotification(`${auth.user.nom} a réceptionné ${po.po_number} (${qtyRecue}/${po.qty} unités)${hasProbleme ? " ⚠ problème signalé" : ""}`, "admin", hasProbleme ? "warning" : "success");
+    addActivity("Réception", `${po.po_number} — ${qtyRecue} unités${hasProbleme ? ` — ${receptionForm.probleme}` : ""}`);
     setReceptionModal(null);
   };
 
@@ -2620,6 +2650,9 @@ const WarehouseOrdersPage = () => {
     }
 
     showToast(`${po.po_number} — picking ${allPicked ? "complet" : "partiel"}`);
+    completeDailyTask(po.po_number, "picking");
+    addNotification(`${auth.user.nom} a préparé ${po.po_number}${hasRupture ? " ⚠ rupture partielle" : ""}`, "admin", hasRupture ? "warning" : "info");
+    addActivity("Picking", `${po.po_number} — ${pickingLines.filter(l=>l.picked).length}/${pickingLines.length} lignes${hasRupture ? " (rupture)" : ""}`);
     setPickingModal(null);
   };
 
@@ -2649,6 +2682,9 @@ const WarehouseOrdersPage = () => {
       "INFO");
 
     showToast(`${po.po_number} rangé — +${qtyToAdd} unités dans ${po.sku}`);
+    completeDailyTask(po.po_number, "rangement");
+    addNotification(`${auth.user.nom} a rangé ${po.po_number} — +${qtyToAdd} unités ${po.sku}`, "admin", "success");
+    addActivity("Rangement", `${po.po_number} — +${qtyToAdd} unités dans ${po.sku}`);
     setRangementModal(null);
   };
 
@@ -2890,6 +2926,181 @@ const WarehouseOrdersPage = () => {
   );
 };
 
+// ─── WAREHOUSE STATS PAGE ────────────────────────────────────────────────────
+const WarehouseStatsPage = () => {
+  const COLORS = useTheme();
+  const { pos, counts, activityLog, dailyTasks } = useData();
+  const auth = useAuth();
+  const nom = auth.user.nom;
+
+  // Réceptions traitées
+  const myReceptions = pos.filter(p => p.received_by === nom);
+  const receptionCount = myReceptions.length;
+  const totalQtyReceived = myReceptions.reduce((s, p) => s + (p.qty_recue || p.qty), 0);
+  const problemCount = myReceptions.filter(p => p.reception_probleme && p.reception_probleme !== "Aucun — conforme").length;
+
+  // Pickings effectués
+  const myPickings = pos.filter(p => p.picking_by === nom);
+  const pickingCount = myPickings.length;
+
+  // Rangements effectués
+  const myRangements = pos.filter(p => p.rangement_by === nom);
+  const rangementCount = myRangements.length;
+  const totalQtyRanged = myRangements.reduce((s, p) => s + (p.qty_recue || p.qty), 0);
+
+  // Comptages inventaire
+  const myComptages = counts.filter(c => c.compteur === nom);
+  const comptageCount = myComptages.length;
+  const comptagesConformes = myComptages.filter(c => Math.abs(c.ecart_pct) <= (ECART_SEUILS[ITEMS.find(i => i.sku === c.sku)?.abc || "C"])).length;
+  const precisionPct = comptageCount > 0 ? (comptagesConformes / comptageCount * 100) : 100;
+
+  // Tâches du jour
+  const myDailyTasks = dailyTasks.filter(t => t.assignee === nom);
+  const completedToday = myDailyTasks.filter(t => t.done).length;
+
+  // Activity timeline
+  const myActivity = activityLog.filter(a => a.user === nom);
+  const activityByType = {};
+  myActivity.forEach(a => { activityByType[a.action] = (activityByType[a.action] || 0) + 1; });
+  const activityChartData = Object.entries(activityByType).map(([action, count]) => ({
+    name: action, value: count,
+    color: action === "Réception" ? "#10b981" : action === "Picking" ? "#3b82f6" : action === "Rangement" ? "#f59e0b" : "#8b5cf6",
+  }));
+
+  // Score global
+  const totalActions = receptionCount + pickingCount + rangementCount + comptageCount;
+  const score = Math.min(100, Math.round(
+    (receptionCount * 10 + pickingCount * 8 + rangementCount * 6 + comptageCount * 5 + completedToday * 3) / Math.max(1, totalActions) * 10
+  ));
+  const scoreColor = score >= 80 ? COLORS.accent : score >= 60 ? COLORS.warning : COLORS.danger;
+  const scoreLabel = score >= 80 ? "Excellent" : score >= 60 ? "Bon" : "À améliorer";
+
+  const StatBlock = ({ label, value, sub, color, icon }) => (
+    <div style={{ background: COLORS.card, borderRadius: 14, padding: "20px 22px", border: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}15`, border: `1px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: color || COLORS.text, letterSpacing: "-0.02em" }}>{value}</div>
+        <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: COLORS.textDim, marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 20, background: COLORS.card, borderRadius: 16, padding: "24px 28px", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: `linear-gradient(135deg, ${auth.user.color}, ${auth.user.color}aa)`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 20 }}>{auth.user.initials}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.text }}>{nom}</div>
+          <div style={{ fontSize: 13, color: COLORS.textMuted }}>{auth.user.poste}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 32, fontWeight: 800, color: scoreColor, letterSpacing: "-0.03em" }}>{score}</div>
+          <div style={{ fontSize: 11, color: scoreColor, fontWeight: 600 }}>{scoreLabel}</div>
+          <div style={{ fontSize: 10, color: COLORS.textDim }}>Score performance</div>
+        </div>
+      </div>
+
+      {/* Stats grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <StatBlock icon="📦" label="Réceptions traitées" value={receptionCount} sub={`${totalQtyReceived} unités reçues`} color="#10b981"/>
+        <StatBlock icon="📋" label="Pickings effectués" value={pickingCount} sub={`commandes préparées`} color="#3b82f6"/>
+        <StatBlock icon="🏷️" label="Rangements confirmés" value={rangementCount} sub={`${totalQtyRanged} unités rangées`} color="#f59e0b"/>
+        <StatBlock icon="🔄" label="Comptages inventaire" value={comptageCount} sub={`${comptagesConformes} conformes`} color="#8b5cf6"/>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* Précision & KPIs */}
+        <Card title="Indicateurs de performance">
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${COLORS.border}22` }}>
+              <span style={{ fontSize: 13, color: COLORS.textMuted }}>Précision comptages</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 80, height: 6, background: COLORS.bg, borderRadius: 3, overflow: "hidden" }}>
+                  <div style={{ width: `${precisionPct}%`, height: "100%", background: precisionPct >= 95 ? COLORS.accent : precisionPct >= 85 ? COLORS.warning : COLORS.danger, borderRadius: 3 }}/>
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: precisionPct >= 95 ? COLORS.accent : precisionPct >= 85 ? COLORS.warning : COLORS.danger }}>{precisionPct.toFixed(1)}%</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${COLORS.border}22` }}>
+              <span style={{ fontSize: 13, color: COLORS.textMuted }}>Problèmes signalés</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: problemCount > 0 ? COLORS.warning : COLORS.accent }}>{problemCount} <span style={{ fontSize: 11, fontWeight: 400, color: COLORS.textDim }}>/ {receptionCount} réceptions</span></span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${COLORS.border}22` }}>
+              <span style={{ fontSize: 13, color: COLORS.textMuted }}>Tâches complétées aujourd'hui</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: completedToday === myDailyTasks.length && myDailyTasks.length > 0 ? COLORS.accent : COLORS.text }}>{completedToday}/{myDailyTasks.length}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${COLORS.border}22` }}>
+              <span style={{ fontSize: 13, color: COLORS.textMuted }}>Total actions ce mois</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{totalActions}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0" }}>
+              <span style={{ fontSize: 13, color: COLORS.textMuted }}>Score global</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: scoreColor }}>{score}/100 — {scoreLabel}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Activity breakdown */}
+        <Card title="Répartition des actions">
+          {activityChartData.length > 0 ? (
+            <div>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={activityChartData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    {activityChartData.map((d, i) => <Cell key={i} fill={d.color} stroke="none"/>)}
+                  </Pie>
+                  <Tooltip/>
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 8 }}>
+                {activityChartData.map(d => (
+                  <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: COLORS.textMuted }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 4, background: d.color }}/>
+                    {d.name}: <strong style={{ color: COLORS.text }}>{d.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: 40, textAlign: "center", color: COLORS.textDim }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+              <div style={{ fontSize: 13 }}>Effectue des actions pour voir tes statistiques</div>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Recent activity */}
+      <Card title={`Historique complet — ${myActivity.length} actions`}>
+        {myActivity.length === 0 ? (
+          <div style={{ padding: 30, textAlign: "center", color: COLORS.textDim }}>Aucune action enregistrée</div>
+        ) : (
+          <TableContainer>
+            <thead><tr><Th>Heure</Th><Th>Action</Th><Th>Détails</Th></tr></thead>
+            <tbody>
+              {myActivity.slice(0, 20).map(a => (
+                <tr key={a.id} onMouseEnter={e => e.currentTarget.style.background = COLORS.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <Td style={{ fontSize: 12, color: COLORS.textDim, whiteSpace: "nowrap" }}>{a.time}</Td>
+                  <Td>
+                    <span style={{ padding: "3px 10px", borderRadius: 5, fontSize: 10, fontWeight: 600,
+                      background: `${a.action === "Réception" ? "#10b981" : a.action === "Picking" ? "#3b82f6" : a.action === "Rangement" ? "#f59e0b" : "#8b5cf6"}15`,
+                      color: a.action === "Réception" ? "#10b981" : a.action === "Picking" ? "#3b82f6" : a.action === "Rangement" ? "#f59e0b" : "#8b5cf6",
+                      border: `1px solid ${a.action === "Réception" ? "#10b981" : a.action === "Picking" ? "#3b82f6" : a.action === "Rangement" ? "#f59e0b" : "#8b5cf6"}30`,
+                    }}>{a.action}</span>
+                  </Td>
+                  <Td style={{ fontSize: 12, color: COLORS.textMuted }}>{a.details}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </TableContainer>
+        )}
+      </Card>
+    </div>
+  );
+};
+
 // ─── NAV CONFIG ──────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   // Admin pages
@@ -2907,6 +3118,7 @@ const NAV_ITEMS = [
   // Entrepôt pages
   { id:"warehouse_home", label:"Mon tableau de bord", icon:"dashboard", roles:["entrepot"] },
   { id:"inventory_readonly", label:"Consulter inventaire", icon:"inventory", roles:["entrepot"] },
+  { id:"warehouse_stats", label:"Mes statistiques", icon:"trs", roles:["entrepot"] },
   // Admin only
   { id:"settings", label:"Règles / Config", icon:"settings", roles:["admin"] },
 ];
@@ -2923,6 +3135,7 @@ const PAGES = {
   cyclecount: CycleCountPage,
   warehouse_orders: WarehouseOrdersPage,
   warehouse_home: WarehouseDashboard,
+  warehouse_stats: WarehouseStatsPage,
   inventory_readonly: InventoryPage,
   settings: SettingsPage,
 };
@@ -2939,6 +3152,7 @@ const PAGE_TITLES = {
   cyclecount: "Inventaire tournant",
   warehouse_orders: "Commandes internes",
   warehouse_home: "Mon tableau de bord",
+  warehouse_stats: "Mes statistiques",
   inventory_readonly: "Inventaire (consultation)",
   settings: "Règles et configuration",
 };
@@ -2993,14 +3207,18 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState(false);
   const [slideOver, setSlideOver] = useState(null);
   const [expandedKPI, setExpandedKPI] = useState(null);
+  const [showNotifs, setShowNotifs] = useState(false);
   const [statusHistory, setStatusHistory] = useState([]);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [dailyTasks, setDailyTasks] = useState(WAREHOUSE_DAILY_TASKS);
+  const [notifications, setNotifications] = useState([]);
+  const [activityLog, setActivityLog] = useState([]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setGlobalSearch(true); }
-      if (e.key === "Escape") { setGlobalSearch(false); setSlideOver(null); setExpandedKPI(null); }
+      if (e.key === "Escape") { setGlobalSearch(false); setSlideOver(null); setExpandedKPI(null); setShowNotifs(false); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -3022,6 +3240,36 @@ export default function App() {
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     setEvents(prev => [{ event_id: prev.length+1, date, type_event, utilisateur: currentUser?.nom || "Système", entite, entite_id, details, level }, ...prev]);
+  }, [currentUser]);
+
+  // Auto-sync daily tasks when warehouse actions complete
+  const completeDailyTask = useCallback((poNumber, actionType) => {
+    setDailyTasks(prev => prev.map(t => {
+      if (t.done) return t;
+      // Match by PO reference AND action type
+      if (t.po_ref === poNumber && t.action_type === actionType) return { ...t, done: true, completed_at: "2026-03-18" };
+      // Match by action type alone for non-PO tasks (rangement generic, etc.)
+      if (!t.po_ref && t.action_type === actionType && t.assignee === currentUser?.nom) return { ...t, done: true, completed_at: "2026-03-18" };
+      return t;
+    }));
+  }, [currentUser]);
+
+  // Notifications between roles
+  const addNotification = useCallback((message, forRole, type="info") => {
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    setNotifications(prev => [{
+      id: prev.length + 1, message, forRole, type, time, read: false, by: currentUser?.nom || "Système",
+    }, ...prev].slice(0, 50)); // Keep max 50
+  }, [currentUser]);
+
+  // Activity log per user
+  const addActivity = useCallback((action, details) => {
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    setActivityLog(prev => [{
+      id: prev.length + 1, user: currentUser?.nom, role: currentUser?.role, action, details, time, date: "2026-03-18",
+    }, ...prev].slice(0, 100)); // Keep max 100
   }, [currentUser]);
 
   const doTransitionPO = useCallback((poId) => {
@@ -3048,6 +3296,11 @@ export default function App() {
       addEvent("PO_TRANSITION", "PurchaseOrder", poId,
         `${po.po_number} : ${oldStatut} → ${newStatut}`, "INFO");
       showToast(`${po.po_number} → ${newStatut}`);
+      // Notify warehouse when PO is sent
+      if (newStatut === "ENVOYE") {
+        addNotification(`Nouveau PO à traiter : ${po.po_number} — ${po.article} (${po.qty} unités)`, "entrepot", "info");
+      }
+      addActivity("Transition PO", `${po.po_number} : ${oldStatut} → ${newStatut}`);
       // Mark related tasks as done
       if (newStatut === "ENVOYE" || newStatut === "CLOS") {
         setTasks(prev => prev.map(t =>
@@ -3153,7 +3406,8 @@ export default function App() {
   const dataValue = useMemo(() => ({
     pos, tasks, events, statusHistory, counts, transitionPO, createPO, setActivePage, confirmAction,
     setSlideOver, setExpandedKPI, setCounts, setTasks, addEvent, showToast, setPos,
-  }), [pos, tasks, events, statusHistory, counts, transitionPO, createPO, confirmAction]);
+    dailyTasks, setDailyTasks, completeDailyTask, notifications, addNotification, activityLog, addActivity,
+  }), [pos, tasks, events, statusHistory, counts, transitionPO, createPO, confirmAction, dailyTasks, notifications, activityLog]);
 
   const openTaskCount = tasks.filter(t => t.status === "Ouverte").length;
   const criticalCount = ITEMS.filter(i => i.priorite === "Haute").length;
@@ -3273,13 +3527,44 @@ export default function App() {
               <span style={{ display:"flex", alignItems:"center", gap:6 }}><Icon name="search" size={14}/>Rechercher...</span>
               <span style={{ padding:"1px 6px", borderRadius:4, background:COLORS.bg, fontSize:10, color:COLORS.textDim, border:`1px solid ${COLORS.border}` }}>⌘K</span>
             </button>
-            <div style={{ position:"relative", cursor:"pointer", color:COLORS.textMuted, transition:"color 0.35s" }} onClick={()=>setActivePage("audit")}>
-              <Icon name="bell" size={20}/>
-              <div style={{ position:"absolute", top:-2, right:-2, width:8, height:8, borderRadius:4, background:COLORS.danger }}/>
-            </div>
-            <button onClick={()=>setActivePage("critical")} style={{ padding:"8px 18px", borderRadius:10, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", letterSpacing:"0.01em" }}>
+            {/* Notification bell */}
+            {(() => {
+              const myNotifs = notifications.filter(n => n.forRole === currentUser?.role || n.forRole === "all");
+              const unreadCount = myNotifs.filter(n => !n.read).length;
+              return (
+                <div style={{ position:"relative" }}>
+                  <div style={{ cursor:"pointer", color:COLORS.textMuted, transition:"color 0.35s" }} onClick={()=>setShowNotifs(s=>!s)}>
+                    <Icon name="bell" size={20}/>
+                    {unreadCount > 0 && <div style={{ position:"absolute", top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:COLORS.danger, color:"white", fontSize:9, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px" }}>{unreadCount}</div>}
+                  </div>
+                  {showNotifs && (
+                    <div style={{ position:"absolute", top:36, right:0, width:360, maxHeight:400, overflowY:"auto", background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:14, boxShadow:"0 12px 40px rgba(0,0,0,0.3)", zIndex:1002 }}>
+                      <div style={{ padding:"14px 18px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:14, fontWeight:700, color:COLORS.text }}>Notifications ({unreadCount})</span>
+                        {unreadCount > 0 && <button onClick={()=>setNotifications(prev=>prev.map(n=>({...n, read:true})))} style={{ fontSize:10, color:COLORS.accent, background:"transparent", border:"none", cursor:"pointer" }}>Tout marquer lu</button>}
+                      </div>
+                      {myNotifs.length === 0 ? (
+                        <div style={{ padding:24, textAlign:"center", color:COLORS.textDim, fontSize:12 }}>Aucune notification</div>
+                      ) : (
+                        myNotifs.slice(0,15).map(n => (
+                          <div key={n.id} style={{ padding:"12px 18px", borderBottom:`1px solid ${COLORS.border}08`, background:n.read?"transparent":`${COLORS.accent}06`, display:"flex", gap:12, alignItems:"flex-start" }}>
+                            <div style={{ width:8, height:8, borderRadius:4, marginTop:5, flexShrink:0,
+                              background:n.type==="warning"?COLORS.warning:n.type==="success"?COLORS.accent:COLORS.info }}/>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:12, color:COLORS.text, lineHeight:1.4 }}>{n.message}</div>
+                              <div style={{ fontSize:10, color:COLORS.textDim, marginTop:3 }}>{n.by} · {n.time}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {currentUser?.role === "admin" && <button onClick={()=>setActivePage("critical")} style={{ padding:"8px 18px", borderRadius:10, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", letterSpacing:"0.01em" }}>
               + Nouveau PO
-            </button>
+            </button>}
           </div>
         </header>
 
