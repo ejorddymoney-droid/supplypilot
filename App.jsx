@@ -1,5 +1,6 @@
 import { useState, useMemo, createContext, useContext, useCallback, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend, ComposedChart } from "recharts";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const APP_VERSION = "v2.5.0";
 
@@ -3635,6 +3636,7 @@ export default function App() {
         @keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
         @keyframes kpiExpand { from { opacity:0; transform: scale(0.97); } to { opacity:1; transform: scale(1); } }
       `}</style>
+      <SpeedInsights />
     </div>
     </DataContext.Provider>
     </AuthContext.Provider>
