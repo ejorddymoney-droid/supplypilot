@@ -1,7 +1,7 @@
 import { useState, useMemo, createContext, useContext, useCallback, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend, ComposedChart } from "recharts";
 
-const APP_VERSION = "v2.1.0";
+const APP_VERSION = "v2.2.0";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const SUPPLIERS = [
@@ -264,6 +264,29 @@ const useTheme = () => useContext(ThemeContext);
 
 const DataContext = createContext(null);
 const useData = () => useContext(DataContext);
+
+// ─── AUTH SYSTEM ─────────────────────────────────────────────────────────────
+const USERS = [
+  { id:1, username:"admin", password:"admin123", role:"admin", nom:"Jean Dupont", poste:"Gestionnaire achats", initials:"JD", color:"#6366f1" },
+  { id:2, username:"entrepot", password:"entrepot123", role:"entrepot", nom:"Marc Bélanger", poste:"Chef d'entrepôt", initials:"MB", color:"#f59e0b" },
+  { id:3, username:"sophie", password:"sophie123", role:"entrepot", nom:"Sophie Gagnon", poste:"Préposée entrepôt", initials:"SG", color:"#10b981" },
+  { id:4, username:"luc", password:"luc123", role:"entrepot", nom:"Luc Martineau", poste:"Manutentionnaire", initials:"LM", color:"#3b82f6" },
+];
+
+const WAREHOUSE_DAILY_TASKS = [
+  { id:1, assignee:"Marc Bélanger", task:"Vérifier réceptions du matin", priority:"Haute", done:false },
+  { id:2, assignee:"Marc Bélanger", task:"Préparer PO-2026-0001 (Nano Bolt 305)", priority:"Haute", done:false },
+  { id:3, assignee:"Marc Bélanger", task:"Comptage allée B — articles classe A", priority:"Moyenne", done:false },
+  { id:4, assignee:"Sophie Gagnon", task:"Préparer PO-2026-0003 (Smart Label 218)", priority:"Haute", done:false },
+  { id:5, assignee:"Sophie Gagnon", task:"Ranger réception HydroTech SA", priority:"Moyenne", done:false },
+  { id:6, assignee:"Sophie Gagnon", task:"Inventaire tournant — Zone transit", priority:"Basse", done:false },
+  { id:7, assignee:"Luc Martineau", task:"Préparer PO-2026-0010 (Pro Gasket 456)", priority:"Haute", done:false },
+  { id:8, assignee:"Luc Martineau", task:"Consolidation palette secteur C", priority:"Moyenne", done:false },
+  { id:9, assignee:"Luc Martineau", task:"Nettoyage zone de quarantaine", priority:"Basse", done:false },
+];
+
+const AuthContext = createContext(null);
+const useAuth = () => useContext(AuthContext);
 
 // Workflow transition map
 const PO_TRANSITIONS = {
@@ -2293,17 +2316,272 @@ const CycleCountPage = () => {
   );
 };
 
+// ─── LOGIN PAGE ──────────────────────────────────────────────────────────────
+const LoginPage = ({ onLogin }) => {
+  const [isDark] = useState(true);
+  const COLORS = THEMES.dark;
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setTimeout(() => {
+      const user = USERS.find(u => u.username === username && u.password === password);
+      if (user) {
+        onLogin(user);
+      } else {
+        setError("Identifiants invalides");
+        setLoading(false);
+      }
+    }, 600);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:COLORS.bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans', system-ui, sans-serif" }}>
+      <div style={{ width:420, padding:40, background:COLORS.card, borderRadius:24, border:`1px solid ${COLORS.border}`, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+        {/* Logo */}
+        <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:32 }}>
+          <div style={{ width:48, height:48, borderRadius:14, background:`linear-gradient(135deg, #10B981, #059669)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          <div>
+            <div style={{ fontSize:22, fontWeight:700, color:COLORS.text, letterSpacing:"-0.02em" }}>SupplyPilot</div>
+            <div style={{ fontSize:11, color:COLORS.textDim, letterSpacing:"0.04em" }}>PROCUREMENT HUB · {APP_VERSION}</div>
+          </div>
+        </div>
+
+        <div style={{ fontSize:15, fontWeight:600, color:COLORS.text, marginBottom:6 }}>Connexion</div>
+        <div style={{ fontSize:12, color:COLORS.textDim, marginBottom:24 }}>Entrez vos identifiants pour accéder à l'application</div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom:16 }}>
+            <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:6 }}>Nom d'utilisateur</label>
+            <input value={username} onChange={e=>setUsername(e.target.value)} placeholder="admin ou entrepot"
+              style={{ width:"100%", padding:"11px 14px", borderRadius:10, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
+              onFocus={e=>e.target.style.borderColor="#10B981"} onBlur={e=>e.target.style.borderColor=COLORS.border}/>
+          </div>
+          <div style={{ marginBottom:20 }}>
+            <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:6 }}>Mot de passe</label>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••"
+              style={{ width:"100%", padding:"11px 14px", borderRadius:10, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:14, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
+              onFocus={e=>e.target.style.borderColor="#10B981"} onBlur={e=>e.target.style.borderColor=COLORS.border}/>
+          </div>
+
+          {error && <div style={{ padding:"10px 14px", borderRadius:8, background:"rgba(239,68,68,0.15)", border:"1px solid rgba(239,68,68,0.3)", color:"#EF4444", fontSize:12, fontWeight:500, marginBottom:16 }}>{error}</div>}
+
+          <button type="submit" disabled={loading || !username || !password}
+            style={{ width:"100%", padding:"12px", borderRadius:10, border:"none", background:`linear-gradient(135deg, #10B981, #059669)`, color:"white", fontSize:14, fontWeight:600, cursor:"pointer", opacity:(loading||!username||!password)?0.6:1, fontFamily:"inherit", letterSpacing:"0.01em" }}>
+            {loading ? "Connexion..." : "Se connecter"}
+          </button>
+        </form>
+
+        <div style={{ marginTop:24, padding:16, background:COLORS.surface, borderRadius:10, border:`1px solid ${COLORS.border}` }}>
+          <div style={{ fontSize:11, fontWeight:600, color:COLORS.textMuted, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.04em" }}>Comptes démo</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12 }}>
+              <span style={{ color:COLORS.textMuted }}>Admin complet</span>
+              <span style={{ color:COLORS.accent, fontFamily:"monospace" }}>admin / admin123</span>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12 }}>
+              <span style={{ color:COLORS.textMuted }}>Chef entrepôt</span>
+              <span style={{ color:COLORS.accent, fontFamily:"monospace" }}>entrepot / entrepot123</span>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:12 }}>
+              <span style={{ color:COLORS.textMuted }}>Préposée entrepôt</span>
+              <span style={{ color:COLORS.accent, fontFamily:"monospace" }}>sophie / sophie123</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        input::placeholder { color: #5C6682; }
+      `}</style>
+    </div>
+  );
+};
+
+// ─── WAREHOUSE DASHBOARD ─────────────────────────────────────────────────────
+const WarehouseDashboard = () => {
+  const COLORS = useTheme();
+  const { pos, counts } = useData();
+  const auth = useAuth();
+  const [dailyTasks, setDailyTasks] = useState(WAREHOUSE_DAILY_TASKS.filter(t => t.assignee === auth.user.nom));
+
+  const toggleTask = (id) => setDailyTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+
+  const myPOs = pos.filter(p => p.statut === "ENVOYE");
+  const myCountsToday = counts.filter(c => c.compteur === auth.user.nom && c.date >= "2026-03-14").length;
+  const tasksCompleted = dailyTasks.filter(t => t.done).length;
+  const priorityColors = { Haute: COLORS.danger, Moyenne: COLORS.warning, Basse: COLORS.info };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      {/* Welcome */}
+      <div style={{ background:`linear-gradient(135deg, ${COLORS.accent}15, ${COLORS.info}10)`, borderRadius:16, padding:"24px 28px", border:`1px solid ${COLORS.border}` }}>
+        <div style={{ fontSize:22, fontWeight:700, color:COLORS.text, marginBottom:4 }}>Bonjour, {auth.user.nom.split(' ')[0]} 👋</div>
+        <div style={{ fontSize:13, color:COLORS.textMuted }}>{auth.user.poste} — 18 mars 2026</div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:14 }}>
+        <KpiCard label="Mes tâches du jour" value={`${tasksCompleted}/${dailyTasks.length}`} sub="Complétées" color={tasksCompleted===dailyTasks.length?COLORS.accent:COLORS.warning}/>
+        <KpiCard label="Commandes à préparer" value={myPOs.length} sub="Statut ENVOYÉ" color={COLORS.info}/>
+        <KpiCard label="Comptages effectués" value={myCountsToday} sub="Aujourd'hui" color={COLORS.accent}/>
+        <KpiCard label="Progression" value={`${dailyTasks.length>0?Math.round(tasksCompleted/dailyTasks.length*100):0}%`} color={tasksCompleted===dailyTasks.length?COLORS.accent:COLORS.warning}/>
+      </div>
+
+      {/* Daily tasks */}
+      <Card title={`Mes tâches du jour — ${auth.user.nom}`}>
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          {dailyTasks.length === 0 && <div style={{ padding:20, textAlign:"center", color:COLORS.textDim }}>Aucune tâche assignée</div>}
+          {dailyTasks.map(t => (
+            <div key={t.id} onClick={() => toggleTask(t.id)}
+              style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 16px", borderRadius:10,
+                background: t.done ? `${COLORS.accent}08` : COLORS.surface,
+                border:`1px solid ${t.done ? COLORS.accentDim : COLORS.border}`,
+                cursor:"pointer", transition:"all 0.15s" }}>
+              <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${t.done?COLORS.accent:COLORS.textDim}`,
+                background:t.done?COLORS.accent:"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                {t.done && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:500, color:t.done?COLORS.textDim:COLORS.text, textDecoration:t.done?"line-through":"none" }}>{t.task}</div>
+              </div>
+              <span style={{ padding:"3px 10px", borderRadius:5, fontSize:10, fontWeight:600,
+                background:`${priorityColors[t.priority]}15`, color:priorityColors[t.priority],
+                border:`1px solid ${priorityColors[t.priority]}30` }}>{t.priority}</span>
+            </div>
+          ))}
+        </div>
+        {dailyTasks.length > 0 && (
+          <div style={{ marginTop:14, height:6, background:COLORS.bg, borderRadius:3, overflow:"hidden" }}>
+            <div style={{ width:`${dailyTasks.length>0?tasksCompleted/dailyTasks.length*100:0}%`, height:"100%", background:COLORS.accent, borderRadius:3, transition:"width 0.3s" }}/>
+          </div>
+        )}
+      </Card>
+
+      {/* Quick access: orders to prepare */}
+      <Card title={`Commandes à préparer (${myPOs.length})`}>
+        {myPOs.length === 0 ? (
+          <div style={{ padding:20, textAlign:"center", color:COLORS.textDim }}>Aucune commande en attente de préparation</div>
+        ) : (
+          <TableContainer>
+            <thead><tr><Th>PO #</Th><Th>Article</Th><Th>Qty</Th><Th>Fournisseur</Th><Th>Créé le</Th></tr></thead>
+            <tbody>
+              {myPOs.slice(0,5).map(po => (
+                <tr key={po.po_id} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <Td style={{ fontWeight:700, color:COLORS.accent }}>{po.po_number}</Td>
+                  <Td style={{ fontWeight:500 }}>{po.article}</Td>
+                  <Td style={{ fontWeight:600 }}>{po.qty}</Td>
+                  <Td style={{ color:COLORS.textMuted }}>{SUPPLIER_MAP[po.supplier_id]?.split(' ')[0]}</Td>
+                  <Td style={{ color:COLORS.textDim, fontSize:12 }}>{po.date_creation}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </TableContainer>
+        )}
+      </Card>
+    </div>
+  );
+};
+
+// ─── WAREHOUSE ORDERS PAGE ───────────────────────────────────────────────────
+const WarehouseOrdersPage = () => {
+  const COLORS = useTheme();
+  const { pos, transitionPO, addEvent, showToast } = useData();
+  const auth = useAuth();
+  const [filter, setFilter] = useState("ENVOYE");
+
+  const warehousePOs = useMemo(() => {
+    return pos.filter(p => {
+      if (filter === "all") return ["ENVOYE","RECU"].includes(p.statut);
+      return p.statut === filter;
+    });
+  }, [pos, filter]);
+
+  const handlePrepare = (po) => {
+    addEvent("WAREHOUSE_PREPARED", "PurchaseOrder", po.po_id,
+      `${po.po_number} marqué préparé par ${auth.user.nom}`, "INFO", auth.user.nom);
+    showToast(`${po.po_number} — préparation confirmée`);
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12 }}>
+        <KpiCard label="À préparer" value={pos.filter(p=>p.statut==="ENVOYE").length} color={COLORS.info}/>
+        <KpiCard label="Reçus à ranger" value={pos.filter(p=>p.statut==="RECU").length} color={COLORS.accent}/>
+        <KpiCard label="Traités aujourd'hui" value={0} sub="18 mars 2026" color={COLORS.purple}/>
+      </div>
+
+      <div style={{ display:"flex", gap:8 }}>
+        {[{id:"ENVOYE",label:"À préparer"},{id:"RECU",label:"Reçus"},{id:"all",label:"Tous"}].map(f => (
+          <button key={f.id} onClick={()=>setFilter(f.id)}
+            style={{ padding:"6px 16px", borderRadius:8, border:`1px solid ${filter===f.id?COLORS.accent:COLORS.border}`,
+              background:filter===f.id?COLORS.accentGlow:"transparent", color:filter===f.id?COLORS.accent:COLORS.textMuted,
+              fontSize:12, fontWeight:filter===f.id?600:400, cursor:"pointer", transition:"all 0.15s" }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <Card title={`Commandes internes — ${warehousePOs.length}`}>
+        <TableContainer>
+          <thead><tr><Th>PO #</Th><Th>Article</Th><Th>SKU</Th><Th>Qty</Th><Th>Fournisseur</Th><Th>Statut</Th><Th>Date</Th><Th>Action</Th></tr></thead>
+          <tbody>
+            {warehousePOs.map(po => (
+              <tr key={po.po_id} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <Td style={{ fontWeight:700, color:COLORS.accent }}>{po.po_number}</Td>
+                <Td style={{ fontWeight:500 }}>{po.article}</Td>
+                <Td style={{ color:COLORS.textDim, fontSize:12 }}>{po.sku}</Td>
+                <Td style={{ fontWeight:600 }}>{po.qty}</Td>
+                <Td style={{ color:COLORS.textMuted }}>{SUPPLIER_MAP[po.supplier_id]?.split(' ')[0]}</Td>
+                <Td><Badge>{po.statut}</Badge></Td>
+                <Td style={{ color:COLORS.textMuted, fontSize:12 }}>{po.date_creation}</Td>
+                <Td>
+                  {po.statut==="ENVOYE" && (
+                    <button onClick={()=>handlePrepare(po)}
+                      style={{ padding:"4px 12px", borderRadius:6, border:`1px solid ${COLORS.accent}`, background:COLORS.accentGlow, color:COLORS.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}>
+                      ✓ Préparé
+                    </button>
+                  )}
+                  {po.statut==="RECU" && <span style={{ fontSize:11, color:COLORS.accent }}>✓ Rangé</span>}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </TableContainer>
+        {warehousePOs.length === 0 && <div style={{ padding:30, textAlign:"center", color:COLORS.textDim }}>Aucune commande dans ce filtre</div>}
+      </Card>
+    </div>
+  );
+};
+
+// ─── NAV CONFIG ──────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id:"dashboard", label:"Dashboard", icon:"dashboard" },
-  { id:"inventory", label:"Inventaire", icon:"inventory" },
-  { id:"critical", label:"Articles critiques", icon:"critical" },
-  { id:"suppliers", label:"Fournisseurs", icon:"suppliers" },
-  { id:"orders", label:"Purchase Orders", icon:"orders" },
-  { id:"tasks", label:"Tâches", icon:"tasks" },
-  { id:"audit", label:"Journal d'audit", icon:"audit" },
-  { id:"trs", label:"Performance TRS", icon:"trs" },
-  { id:"cyclecount", label:"Inventaire tournant", icon:"cyclecount" },
-  { id:"settings", label:"Règles / Config", icon:"settings" },
+  // Admin pages
+  { id:"dashboard", label:"Dashboard", icon:"dashboard", roles:["admin"] },
+  { id:"inventory", label:"Inventaire", icon:"inventory", roles:["admin"] },
+  { id:"critical", label:"Articles critiques", icon:"critical", roles:["admin"] },
+  { id:"suppliers", label:"Fournisseurs", icon:"suppliers", roles:["admin"] },
+  { id:"orders", label:"Purchase Orders", icon:"orders", roles:["admin"] },
+  { id:"tasks", label:"Tâches", icon:"tasks", roles:["admin"] },
+  { id:"audit", label:"Journal d'audit", icon:"audit", roles:["admin"] },
+  { id:"trs", label:"Performance TRS", icon:"trs", roles:["admin"] },
+  // Shared pages
+  { id:"warehouse_orders", label:"Commandes internes", icon:"orders", roles:["admin","entrepot"] },
+  { id:"cyclecount", label:"Inventaire tournant", icon:"cyclecount", roles:["admin","entrepot"] },
+  // Entrepôt pages
+  { id:"warehouse_home", label:"Mon tableau de bord", icon:"dashboard", roles:["entrepot"] },
+  { id:"inventory_readonly", label:"Consulter inventaire", icon:"inventory", roles:["entrepot"] },
+  // Admin only
+  { id:"settings", label:"Règles / Config", icon:"settings", roles:["admin"] },
 ];
 
 const PAGES = {
@@ -2316,6 +2594,9 @@ const PAGES = {
   audit: AuditPage,
   trs: TRSPage,
   cyclecount: CycleCountPage,
+  warehouse_orders: WarehouseOrdersPage,
+  warehouse_home: WarehouseDashboard,
+  inventory_readonly: InventoryPage,
   settings: SettingsPage,
 };
 
@@ -2329,6 +2610,9 @@ const PAGE_TITLES = {
   audit: "Journal d'audit",
   trs: "Performance TRS",
   cyclecount: "Inventaire tournant",
+  warehouse_orders: "Commandes internes",
+  warehouse_home: "Mon tableau de bord",
+  inventory_readonly: "Inventaire (consultation)",
   settings: "Règles et configuration",
 };
 
@@ -2366,7 +2650,8 @@ const ThemeToggle = ({ isDark, onToggle }) => (
 );
 
 export default function App() {
-  const [activePage, setActivePage] = useState("dashboard");
+  const [currentUser, setCurrentUser] = useState(null);
+  const [activePage, setActivePage] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const COLORS = isDark ? THEMES.dark : THEMES.light;
@@ -2379,10 +2664,12 @@ export default function App() {
   const [nextPoId, setNextPoId] = useState(21);
   const [toast, setToast] = useState(null);
   const [globalSearch, setGlobalSearch] = useState(false);
-  const [slideOver, setSlideOver] = useState(null); // { data, type }
-  const [expandedKPI, setExpandedKPI] = useState(null); // "abc" | "couverture" | "familles" | "po_statut"
+  const [slideOver, setSlideOver] = useState(null);
+  const [expandedKPI, setExpandedKPI] = useState(null);
+  const [statusHistory, setStatusHistory] = useState([]);
+  const [confirmAction, setConfirmAction] = useState(null);
 
-  // ⌘K / Ctrl+K keyboard shortcut
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setGlobalSearch(true); }
@@ -2392,15 +2679,12 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // ⌘K / Ctrl+K shortcut
-  useEffect(() => {
-    const handler = (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setGlobalSearch(true); } };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
-
-  const [statusHistory, setStatusHistory] = useState([]);
-  const [confirmAction, setConfirmAction] = useState(null);
+  // Auth handlers
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+    setActivePage(user.role === "admin" ? "dashboard" : "warehouse_home");
+  };
+  const handleLogout = () => { setCurrentUser(null); setActivePage(null); };
 
   const showToast = useCallback((msg, type="success") => {
     setToast({ msg, type });
@@ -2410,8 +2694,8 @@ export default function App() {
   const addEvent = useCallback((type_event, entite, entite_id, details, level="INFO") => {
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    setEvents(prev => [{ event_id: prev.length+1, date, type_event, utilisateur:"Jean Dupont", entite, entite_id, details, level }, ...prev]);
-  }, []);
+    setEvents(prev => [{ event_id: prev.length+1, date, type_event, utilisateur: currentUser?.nom || "Système", entite, entite_id, details, level }, ...prev]);
+  }, [currentUser]);
 
   const doTransitionPO = useCallback((poId) => {
     setPos(prev => prev.map(po => {
@@ -2558,8 +2842,16 @@ export default function App() {
   }, [counts]);
   const badgeCounts = { critical: criticalCount, orders: poToProcessCount, tasks: openTaskCount, audit: errorCount, cyclecount: cycleCountRemaining };
 
+  // Auth guard: show login if not authenticated
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  const authValue = { user: currentUser, logout: handleLogout };
+
   return (
     <ThemeContext.Provider value={COLORS}>
+    <AuthContext.Provider value={authValue}>
     <DataContext.Provider value={dataValue}>
     <div style={{ display:"flex", height:"100vh", fontFamily:"'DM Sans', 'Segoe UI', system-ui, sans-serif", background:COLORS.bg, color:COLORS.text, overflow:"hidden", transition:"background 0.35s ease, color 0.35s ease" }}>
       {/* Sidebar */}
@@ -2586,7 +2878,7 @@ export default function App() {
 
         {/* Nav */}
         <nav style={{ flex:1, padding:"12px 8px", display:"flex", flexDirection:"column", gap:2 }}>
-          {NAV_ITEMS.map(item => {
+          {NAV_ITEMS.filter(item => item.roles.includes(currentUser?.role)).map(item => {
             const isActive = activePage===item.id;
             return (
               <button key={item.id} onClick={()=>setActivePage(item.id)}
@@ -2604,7 +2896,7 @@ export default function App() {
                 <span style={{ flexShrink:0 }}><Icon name={item.icon} size={18}/></span>
                 {!sidebarCollapsed && <span>{item.label}</span>}
                 {!sidebarCollapsed && badgeCounts[item.id] > 0 && (
-                  <span style={{ marginLeft:"auto", background:item.id==="audit"?COLORS.danger:item.id==="critical"?"#f43f5e":item.id==="orders"?COLORS.warning:item.id==="cyclecount"?COLORS.info:COLORS.danger, color:"#fff", fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, minWidth:18, textAlign:"center" }}>
+                  <span style={{ marginLeft:"auto", background:item.id==="audit"?COLORS.danger:item.id==="critical"?"#f43f5e":item.id==="orders"||item.id==="warehouse_orders"?COLORS.warning:item.id==="cyclecount"?COLORS.info:COLORS.danger, color:"#fff", fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10, minWidth:18, textAlign:"center" }}>
                     {badgeCounts[item.id]}
                   </span>
                 )}
@@ -2619,15 +2911,23 @@ export default function App() {
           {!sidebarCollapsed && <span style={{ fontSize:12, color:COLORS.textMuted, transition:"color 0.35s" }}>{isDark ? "Mode sombre" : "Mode clair"}</span>}
         </div>
 
-        {/* User */}
+        {/* User + Logout */}
         {!sidebarCollapsed && (
-          <div style={{ padding:"16px 20px", borderTop:`1px solid ${COLORS.border}`, display:"flex", alignItems:"center", gap:10, transition:"border-color 0.35s" }}>
-            <div style={{ width:34, height:34, borderRadius:10, background:`linear-gradient(135deg, #6366f1, #8b5cf6)`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:700, fontSize:13, flexShrink:0 }}>JD</div>
-            <div>
-              <div style={{ fontSize:13, fontWeight:600, color:COLORS.text, transition:"color 0.35s" }}>Jean Dupont</div>
-              <div style={{ fontSize:11, color:COLORS.textDim, transition:"color 0.35s" }}>Gestionnaire achats</div>
+          <div style={{ padding:"12px 20px", borderTop:`1px solid ${COLORS.border}`, transition:"border-color 0.35s" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+              <div style={{ width:34, height:34, borderRadius:10, background:`linear-gradient(135deg, ${currentUser?.color || "#6366f1"}, ${currentUser?.color || "#8b5cf6"}cc)`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:700, fontSize:13, flexShrink:0 }}>{currentUser?.initials}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:COLORS.text, transition:"color 0.35s" }}>{currentUser?.nom}</div>
+                <div style={{ fontSize:11, color:COLORS.textDim, transition:"color 0.35s" }}>{currentUser?.poste}</div>
+              </div>
+              <span style={{ fontSize:9, color:COLORS.textDim, opacity:0.5 }}>{APP_VERSION}</span>
             </div>
-            <span style={{ fontSize:9, color:COLORS.textDim, marginLeft:"auto", opacity:0.5 }}>{APP_VERSION}</span>
+            <button onClick={handleLogout} style={{ width:"100%", padding:"6px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, fontSize:11, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6, transition:"all 0.15s" }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=COLORS.danger;e.currentTarget.style.color=COLORS.danger;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=COLORS.border;e.currentTarget.style.color=COLORS.textMuted;}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Déconnexion
+            </button>
           </div>
         )}
       </div>
@@ -2725,6 +3025,7 @@ export default function App() {
       `}</style>
     </div>
     </DataContext.Provider>
+    </AuthContext.Provider>
     </ThemeContext.Provider>
   );
 }
