@@ -1,7 +1,7 @@
 import { useState, useMemo, createContext, useContext, useCallback, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend, ComposedChart } from "recharts";
 
-const APP_VERSION = "v2.2.0";
+const APP_VERSION = "v2.3.0";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const SUPPLIERS = [
@@ -2495,33 +2495,177 @@ const WarehouseDashboard = () => {
 // ─── WAREHOUSE ORDERS PAGE ───────────────────────────────────────────────────
 const WarehouseOrdersPage = () => {
   const COLORS = useTheme();
-  const { pos, transitionPO, addEvent, showToast } = useData();
+  const { pos, addEvent, showToast, setPos, setTasks, tasks } = useData();
   const auth = useAuth();
   const [filter, setFilter] = useState("ENVOYE");
+  const [search, setSearch] = useState("");
+  const [receptionModal, setReceptionModal] = useState(null); // PO object
+  const [receptionForm, setReceptionForm] = useState({ qtyRecue:"", probleme:null, note:"" });
+  const [pickingModal, setPickingModal] = useState(null); // PO object
+  const [pickingLines, setPickingLines] = useState([]);
+  const [rangementModal, setRangementModal] = useState(null); // PO object
+
+  const PROBLEMES = ["Aucun — conforme","Colis endommagé","Quantité manquante","Mauvais article reçu","Article défectueux","Documentation manquante"];
 
   const warehousePOs = useMemo(() => {
-    return pos.filter(p => {
-      if (filter === "all") return ["ENVOYE","RECU"].includes(p.statut);
+    let filtered = pos.filter(p => {
+      if (filter === "all") return ["ENVOYE","RECU","CLOS"].includes(p.statut);
       return p.statut === filter;
     });
-  }, [pos, filter]);
+    if (search) {
+      const s = search.toLowerCase();
+      filtered = filtered.filter(p => p.po_number.toLowerCase().includes(s) || p.article.toLowerCase().includes(s) || p.sku.toLowerCase().includes(s));
+    }
+    return filtered;
+  }, [pos, filter, search]);
 
-  const handlePrepare = (po) => {
-    addEvent("WAREHOUSE_PREPARED", "PurchaseOrder", po.po_id,
-      `${po.po_number} marqué préparé par ${auth.user.nom}`, "INFO", auth.user.nom);
-    showToast(`${po.po_number} — préparation confirmée`);
+  // Calculate days since sent for urgency
+  const daysSinceSent = (po) => {
+    if (!po.date_envoi) return 0;
+    const sent = new Date(po.date_envoi);
+    const now = new Date("2026-03-18");
+    return Math.floor((now - sent) / (1000*60*60*24));
+  };
+
+  const todayActions = pos.filter(p => p.received_by === auth.user.nom && p.date_reception === "2026-03-18").length;
+
+  // ─── RÉCEPTION ─────────────────────────────────
+  const handleOpenReception = (po) => {
+    setReceptionForm({ qtyRecue: String(po.qty), probleme: null, note: "" });
+    setReceptionModal(po);
+  };
+
+  const handleConfirmReception = () => {
+    const po = receptionModal;
+    if (!po) return;
+    const qtyRecue = parseInt(receptionForm.qtyRecue) || 0;
+    const ecart = qtyRecue - po.qty;
+    const ecartPct = po.qty > 0 ? Math.abs(ecart / po.qty * 100) : 0;
+    const hasProbleme = receptionForm.probleme && receptionForm.probleme !== "Aucun — conforme";
+
+    // Update PO: ENVOYE → RECU
+    setPos(prev => prev.map(p => p.po_id === po.po_id ? {
+      ...p, statut: "RECU", date_reception: "2026-03-18",
+      qty_recue: qtyRecue,
+      prix_paye: +(p.prix_negocie * (0.97 + Math.random() * 0.06)).toFixed(2),
+      received_by: auth.user.nom,
+      reception_note: receptionForm.note,
+      reception_probleme: receptionForm.probleme,
+    } : p));
+
+    // Audit event
+    const level = hasProbleme || ecartPct > 5 ? "WARNING" : "INFO";
+    addEvent("PO_RECEIVED", "PurchaseOrder", po.po_id,
+      `${po.po_number} réceptionné par ${auth.user.nom} — Qty: ${qtyRecue}/${po.qty}${hasProbleme ? ` — Problème: ${receptionForm.probleme}` : ""}${receptionForm.note ? ` — Note: ${receptionForm.note}` : ""}`,
+      level);
+
+    // Investigation task if qty ecart > 5%
+    if (ecartPct > 5) {
+      setTasks(prev => [{
+        task_id: prev.length + 200, type: "Investigation écart réception",
+        related_po_id: po.po_id, assigned_to: "Jean Dupont", status: "Ouverte",
+        due_at: "2026-03-25", comment: `${po.po_number} — Écart réception: ${ecart} unités (${ecartPct.toFixed(1)}%) reçu par ${auth.user.nom}`,
+      }, ...prev]);
+    }
+
+    // Investigation task if problem reported
+    if (hasProbleme) {
+      setTasks(prev => [{
+        task_id: prev.length + 201, type: "Problème réception fournisseur",
+        related_po_id: po.po_id, assigned_to: "Marie Lavoie", status: "Ouverte",
+        due_at: "2026-03-22", comment: `${po.po_number} — ${receptionForm.probleme}${receptionForm.note ? `: ${receptionForm.note}` : ""}`,
+      }, ...prev]);
+    }
+
+    showToast(`${po.po_number} réceptionné — ${qtyRecue} unités${hasProbleme ? " (problème signalé)" : ""}`);
+    setReceptionModal(null);
+  };
+
+  // ─── PICKING / PRÉPARATION ─────────────────────
+  const handleOpenPicking = (po) => {
+    // Generate picking lines from PO
+    const item = ITEMS.find(i => i.sku === po.sku);
+    const lines = [
+      { id: 1, sku: po.sku, article: po.article, qty: po.qty, emplacement: item ? `Allée ${item.famille.charAt(0)}-${String(item.id % 20 + 1).padStart(2, '0')}` : "A-01", picked: false, qtyPicked: po.qty, rupture: false },
+    ];
+    setPickingLines(lines);
+    setPickingModal(po);
+  };
+
+  const togglePickLine = (lineId) => {
+    setPickingLines(prev => prev.map(l => l.id === lineId ? { ...l, picked: !l.picked } : l));
+  };
+
+  const handleConfirmPicking = () => {
+    const po = pickingModal;
+    if (!po) return;
+    const allPicked = pickingLines.every(l => l.picked);
+    const hasRupture = pickingLines.some(l => l.rupture);
+
+    // Update PO with picking info
+    setPos(prev => prev.map(p => p.po_id === po.po_id ? {
+      ...p, picking_done: true, picking_by: auth.user.nom, picking_date: "2026-03-18",
+    } : p));
+
+    addEvent("WAREHOUSE_PICKING", "PurchaseOrder", po.po_id,
+      `${po.po_number} préparé par ${auth.user.nom} — ${pickingLines.filter(l => l.picked).length}/${pickingLines.length} lignes${hasRupture ? " (rupture partielle)" : ""}`,
+      hasRupture ? "WARNING" : "INFO");
+
+    if (hasRupture) {
+      setTasks(prev => [{
+        task_id: prev.length + 300, type: "Rupture partielle picking",
+        related_po_id: po.po_id, assigned_to: "Jean Dupont", status: "Ouverte",
+        due_at: "2026-03-20", comment: `${po.po_number} — rupture signalée par ${auth.user.nom}`,
+      }, ...prev]);
+    }
+
+    showToast(`${po.po_number} — picking ${allPicked ? "complet" : "partiel"}`);
+    setPickingModal(null);
+  };
+
+  // ─── RANGEMENT ─────────────────────────────────
+  const handleRangement = (po) => {
+    setRangementModal(po);
+  };
+
+  const handleConfirmRangement = () => {
+    const po = rangementModal;
+    if (!po) return;
+    const item = ITEMS.find(i => i.sku === po.sku);
+    const qtyToAdd = po.qty_recue || po.qty;
+
+    // Update stock_net on the item
+    if (item) {
+      item.stock_net += qtyToAdd;
+    }
+
+    // Mark PO as ranged
+    setPos(prev => prev.map(p => p.po_id === po.po_id ? {
+      ...p, rangement_done: true, rangement_by: auth.user.nom, rangement_date: "2026-03-18",
+    } : p));
+
+    addEvent("WAREHOUSE_RANGEMENT", "PurchaseOrder", po.po_id,
+      `${po.po_number} rangé par ${auth.user.nom} — ${qtyToAdd} unités ajoutées au stock de ${po.sku}`,
+      "INFO");
+
+    showToast(`${po.po_number} rangé — +${qtyToAdd} unités dans ${po.sku}`);
+    setRangementModal(null);
   };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12 }}>
-        <KpiCard label="À préparer" value={pos.filter(p=>p.statut==="ENVOYE").length} color={COLORS.info}/>
-        <KpiCard label="Reçus à ranger" value={pos.filter(p=>p.statut==="RECU").length} color={COLORS.accent}/>
-        <KpiCard label="Traités aujourd'hui" value={0} sub="18 mars 2026" color={COLORS.purple}/>
+      {/* KPIs */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:12 }}>
+        <KpiCard label="À réceptionner" value={pos.filter(p=>p.statut==="ENVOYE").length} color={COLORS.info}/>
+        <KpiCard label="À ranger" value={pos.filter(p=>p.statut==="RECU" && !p.rangement_done).length} color={COLORS.warning}/>
+        <KpiCard label="Picking à faire" value={pos.filter(p=>p.statut==="ENVOYE" && !p.picking_done).length} color={COLORS.purple}/>
+        <KpiCard label="Traités aujourd'hui" value={todayActions} sub="18 mars 2026" color={COLORS.accent}/>
+        <KpiCard label="En retard (>7j)" value={pos.filter(p=>p.statut==="ENVOYE"&&daysSinceSent(p)>7).length} color={pos.filter(p=>p.statut==="ENVOYE"&&daysSinceSent(p)>7).length>0?COLORS.danger:COLORS.textDim}/>
       </div>
 
-      <div style={{ display:"flex", gap:8 }}>
-        {[{id:"ENVOYE",label:"À préparer"},{id:"RECU",label:"Reçus"},{id:"all",label:"Tous"}].map(f => (
+      {/* Filters + Search */}
+      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+        {[{id:"ENVOYE",label:"À traiter"},{id:"RECU",label:"Reçus"},{id:"all",label:"Tous"}].map(f => (
           <button key={f.id} onClick={()=>setFilter(f.id)}
             style={{ padding:"6px 16px", borderRadius:8, border:`1px solid ${filter===f.id?COLORS.accent:COLORS.border}`,
               background:filter===f.id?COLORS.accentGlow:"transparent", color:filter===f.id?COLORS.accent:COLORS.textMuted,
@@ -2529,36 +2673,219 @@ const WarehouseOrdersPage = () => {
             {f.label}
           </button>
         ))}
+        <div style={{ flex:1 }}/>
+        <div style={{ position:"relative" }}>
+          <Icon name="search" size={14} />
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher PO, article, SKU..."
+            style={{ padding:"7px 12px 7px 32px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:12, outline:"none", width:220, fontFamily:"inherit" }}/>
+        </div>
       </div>
 
+      {/* Table */}
       <Card title={`Commandes internes — ${warehousePOs.length}`}>
         <TableContainer>
-          <thead><tr><Th>PO #</Th><Th>Article</Th><Th>SKU</Th><Th>Qty</Th><Th>Fournisseur</Th><Th>Statut</Th><Th>Date</Th><Th>Action</Th></tr></thead>
+          <thead><tr><Th>PO #</Th><Th>Article</Th><Th>SKU</Th><Th>Qty</Th><Th>Fournisseur</Th><Th>Statut</Th><Th>Envoyé</Th><Th>Urgence</Th><Th>Actions</Th></tr></thead>
           <tbody>
-            {warehousePOs.map(po => (
-              <tr key={po.po_id} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <Td style={{ fontWeight:700, color:COLORS.accent }}>{po.po_number}</Td>
-                <Td style={{ fontWeight:500 }}>{po.article}</Td>
-                <Td style={{ color:COLORS.textDim, fontSize:12 }}>{po.sku}</Td>
-                <Td style={{ fontWeight:600 }}>{po.qty}</Td>
-                <Td style={{ color:COLORS.textMuted }}>{SUPPLIER_MAP[po.supplier_id]?.split(' ')[0]}</Td>
-                <Td><Badge>{po.statut}</Badge></Td>
-                <Td style={{ color:COLORS.textMuted, fontSize:12 }}>{po.date_creation}</Td>
-                <Td>
-                  {po.statut==="ENVOYE" && (
-                    <button onClick={()=>handlePrepare(po)}
-                      style={{ padding:"4px 12px", borderRadius:6, border:`1px solid ${COLORS.accent}`, background:COLORS.accentGlow, color:COLORS.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}>
-                      ✓ Préparé
-                    </button>
-                  )}
-                  {po.statut==="RECU" && <span style={{ fontSize:11, color:COLORS.accent }}>✓ Rangé</span>}
-                </Td>
-              </tr>
-            ))}
+            {warehousePOs.map(po => {
+              const days = daysSinceSent(po);
+              const urgent = po.statut === "ENVOYE" && days > 7;
+              return (
+                <tr key={po.po_id} style={{ background: urgent ? `${COLORS.danger}08` : "transparent" }}
+                  onMouseEnter={e=>e.currentTarget.style.background=urgent?`${COLORS.danger}12`:COLORS.cardHover}
+                  onMouseLeave={e=>e.currentTarget.style.background=urgent?`${COLORS.danger}08`:"transparent"}>
+                  <Td style={{ fontWeight:700, color:COLORS.accent }}>{po.po_number}</Td>
+                  <Td style={{ fontWeight:500 }}>{po.article}</Td>
+                  <Td style={{ color:COLORS.textDim, fontSize:12 }}>{po.sku}</Td>
+                  <Td style={{ fontWeight:600 }}>{po.qty_recue ? `${po.qty_recue}/${po.qty}` : po.qty}</Td>
+                  <Td style={{ color:COLORS.textMuted, fontSize:12 }}>{SUPPLIER_MAP[po.supplier_id]?.split(' ')[0]}</Td>
+                  <Td><Badge>{po.statut}</Badge></Td>
+                  <Td style={{ color:COLORS.textDim, fontSize:12 }}>{po.date_envoi || "—"}</Td>
+                  <Td>
+                    {urgent && <span style={{ padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:700, background:`${COLORS.danger}20`, color:COLORS.danger, animation:"pulse 1.5s infinite" }}>⚠ {days}j</span>}
+                    {!urgent && po.statut === "ENVOYE" && days > 0 && <span style={{ fontSize:11, color:COLORS.textDim }}>{days}j</span>}
+                  </Td>
+                  <Td>
+                    <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                      {po.statut === "ENVOYE" && <>
+                        <button onClick={()=>handleOpenReception(po)} style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${COLORS.accent}`, background:COLORS.accentGlow, color:COLORS.accent, fontSize:10, fontWeight:600, cursor:"pointer" }}>📦 Réceptionner</button>
+                        {!po.picking_done && <button onClick={()=>handleOpenPicking(po)} style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${COLORS.info}`, background:`${COLORS.info}15`, color:COLORS.info, fontSize:10, fontWeight:600, cursor:"pointer" }}>📋 Picking</button>}
+                        {po.picking_done && <span style={{ fontSize:10, color:COLORS.accent, padding:"4px 8px" }}>✓ Préparé</span>}
+                      </>}
+                      {po.statut === "RECU" && !po.rangement_done && (
+                        <button onClick={()=>handleRangement(po)} style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${COLORS.warning}`, background:`${COLORS.warning}15`, color:COLORS.warning, fontSize:10, fontWeight:600, cursor:"pointer" }}>🏷️ Ranger</button>
+                      )}
+                      {po.statut === "RECU" && po.rangement_done && <span style={{ fontSize:10, color:COLORS.accent }}>✓ Rangé</span>}
+                    </div>
+                  </Td>
+                </tr>
+              );
+            })}
           </tbody>
         </TableContainer>
         {warehousePOs.length === 0 && <div style={{ padding:30, textAlign:"center", color:COLORS.textDim }}>Aucune commande dans ce filtre</div>}
       </Card>
+
+      {/* ─── MODAL: RÉCEPTION ─── */}
+      {receptionModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1005 }}>
+          <div style={{ width:500, maxHeight:"85vh", overflowY:"auto", background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:16, padding:28, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:4 }}>📦 Réception marchandise</div>
+            <div style={{ fontSize:13, color:COLORS.textMuted, marginBottom:20 }}>
+              <strong style={{ color:COLORS.accent }}>{receptionModal.po_number}</strong> — {receptionModal.article} ({receptionModal.sku})
+            </div>
+
+            <div style={{ background:COLORS.surface, borderRadius:10, padding:14, border:`1px solid ${COLORS.border}`, marginBottom:16 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
+                <span style={{ color:COLORS.textMuted }}>Quantité commandée</span>
+                <strong style={{ color:COLORS.text }}>{receptionModal.qty} unités</strong>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginTop:6 }}>
+                <span style={{ color:COLORS.textMuted }}>Fournisseur</span>
+                <span style={{ color:COLORS.text }}>{SUPPLIER_MAP[receptionModal.supplier_id]}</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom:16 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:COLORS.text, display:"block", marginBottom:6 }}>Quantité reçue *</label>
+              <input type="number" value={receptionForm.qtyRecue} onChange={e=>setReceptionForm(f=>({...f, qtyRecue:e.target.value}))}
+                style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.accent, fontSize:18, fontWeight:700, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}/>
+              {receptionForm.qtyRecue && parseInt(receptionForm.qtyRecue) !== receptionModal.qty && (
+                <div style={{ marginTop:8, padding:"8px 12px", borderRadius:8, background:`${Math.abs(parseInt(receptionForm.qtyRecue)-receptionModal.qty)/receptionModal.qty > 0.05 ? COLORS.danger : COLORS.warning}15`, border:`1px solid ${Math.abs(parseInt(receptionForm.qtyRecue)-receptionModal.qty)/receptionModal.qty > 0.05 ? COLORS.danger : COLORS.warning}30`, fontSize:12 }}>
+                  <strong style={{ color: Math.abs(parseInt(receptionForm.qtyRecue)-receptionModal.qty)/receptionModal.qty > 0.05 ? COLORS.danger : COLORS.warning }}>
+                    Écart: {parseInt(receptionForm.qtyRecue) - receptionModal.qty} unités ({((parseInt(receptionForm.qtyRecue) - receptionModal.qty) / receptionModal.qty * 100).toFixed(1)}%)
+                  </strong>
+                  {Math.abs(parseInt(receptionForm.qtyRecue)-receptionModal.qty)/receptionModal.qty > 0.05 && <span style={{ display:"block", marginTop:4, color:COLORS.danger }}>⚠ Écart &gt;5% — une tâche d'investigation sera créée</span>}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom:16 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:COLORS.text, display:"block", marginBottom:8 }}>Signaler un problème</label>
+              <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                {PROBLEMES.map(p => (
+                  <div key={p} onClick={()=>setReceptionForm(f=>({...f, probleme:p}))}
+                    style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 12px", borderRadius:8,
+                      background:receptionForm.probleme===p?COLORS.accentGlow:"transparent", border:`1px solid ${receptionForm.probleme===p?COLORS.accent:COLORS.border}`,
+                      cursor:"pointer", fontSize:12, color:receptionForm.probleme===p?COLORS.accent:COLORS.textMuted, transition:"all 0.15s" }}>
+                    <span style={{ width:14, height:14, borderRadius:7, border:`2px solid ${receptionForm.probleme===p?COLORS.accent:COLORS.textDim}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      {receptionForm.probleme===p && <span style={{ width:6, height:6, borderRadius:3, background:COLORS.accent }}/>}
+                    </span>
+                    {p}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom:20 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:COLORS.text, display:"block", marginBottom:6 }}>Note de réception (optionnel)</label>
+              <textarea value={receptionForm.note} onChange={e=>setReceptionForm(f=>({...f, note:e.target.value}))} rows={2}
+                placeholder="Détails sur l'état de la livraison..."
+                style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:12, outline:"none", resize:"vertical", fontFamily:"inherit", boxSizing:"border-box" }}/>
+            </div>
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={()=>setReceptionModal(null)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:13 }}>Annuler</button>
+              <button onClick={handleConfirmReception} disabled={!receptionForm.qtyRecue}
+                style={{ padding:"8px 20px", borderRadius:8, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", opacity:receptionForm.qtyRecue?1:0.5 }}>
+                Confirmer la réception
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: PICKING ─── */}
+      {pickingModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1005 }}>
+          <div style={{ width:520, maxHeight:"85vh", overflowY:"auto", background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:16, padding:28, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:4 }}>📋 Préparation commande</div>
+            <div style={{ fontSize:13, color:COLORS.textMuted, marginBottom:20 }}>
+              <strong style={{ color:COLORS.info }}>{pickingModal.po_number}</strong> — Cochez chaque ligne au fur et à mesure du picking
+            </div>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:20 }}>
+              {pickingLines.map(line => (
+                <div key={line.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px", borderRadius:10,
+                  background:line.picked?`${COLORS.accent}08`:COLORS.surface, border:`1px solid ${line.picked?COLORS.accentDim:COLORS.border}`, transition:"all 0.15s" }}>
+                  <div onClick={()=>togglePickLine(line.id)} style={{ width:24, height:24, borderRadius:6, border:`2px solid ${line.picked?COLORS.accent:COLORS.textDim}`,
+                    background:line.picked?COLORS.accent:"transparent", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
+                    {line.picked && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:line.picked?COLORS.textDim:COLORS.text, textDecoration:line.picked?"line-through":"none" }}>{line.article}</div>
+                    <div style={{ fontSize:11, color:COLORS.textDim }}>{line.sku} · {line.emplacement}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:16, fontWeight:700, color:line.picked?COLORS.accent:COLORS.text }}>{line.qty}</div>
+                    <div style={{ fontSize:10, color:COLORS.textDim }}>unités</div>
+                  </div>
+                  <button onClick={()=>setPickingLines(prev=>prev.map(l=>l.id===line.id?{...l,rupture:!l.rupture}:l))}
+                    style={{ padding:"3px 8px", borderRadius:5, border:`1px solid ${line.rupture?COLORS.danger:COLORS.border}`,
+                      background:line.rupture?`${COLORS.danger}15`:"transparent", color:line.rupture?COLORS.danger:COLORS.textDim,
+                      fontSize:9, cursor:"pointer", fontWeight:line.rupture?700:400 }}>
+                    {line.rupture ? "⚠ Rupture" : "Rupture?"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background:COLORS.surface, borderRadius:8, padding:12, marginBottom:20, display:"flex", justifyContent:"space-between", fontSize:12 }}>
+              <span style={{ color:COLORS.textMuted }}>Progression</span>
+              <strong style={{ color:pickingLines.every(l=>l.picked)?COLORS.accent:COLORS.warning }}>{pickingLines.filter(l=>l.picked).length}/{pickingLines.length} lignes</strong>
+            </div>
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={()=>setPickingModal(null)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:13 }}>Annuler</button>
+              <button onClick={handleConfirmPicking}
+                style={{ padding:"8px 20px", borderRadius:8, border:"none", background:`linear-gradient(135deg, ${COLORS.info}, #2563EB)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                Confirmer le picking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: RANGEMENT ─── */}
+      {rangementModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1005 }}>
+          <div style={{ width:440, background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:16, padding:28, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:4 }}>🏷️ Confirmation de rangement</div>
+            <div style={{ fontSize:13, color:COLORS.textMuted, marginBottom:20 }}>
+              <strong style={{ color:COLORS.warning }}>{rangementModal.po_number}</strong> — {rangementModal.article}
+            </div>
+
+            <div style={{ background:COLORS.surface, borderRadius:10, padding:16, border:`1px solid ${COLORS.border}`, marginBottom:20 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:8 }}>
+                <span style={{ color:COLORS.textMuted }}>Quantité à ranger</span>
+                <strong style={{ color:COLORS.accent }}>{rangementModal.qty_recue || rangementModal.qty} unités</strong>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:8 }}>
+                <span style={{ color:COLORS.textMuted }}>SKU</span>
+                <span style={{ color:COLORS.text }}>{rangementModal.sku}</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
+                <span style={{ color:COLORS.textMuted }}>Stock actuel</span>
+                <span style={{ color:COLORS.text }}>{ITEMS.find(i=>i.sku===rangementModal.sku)?.stock_net || 0} unités</span>
+              </div>
+              <div style={{ marginTop:12, padding:"10px 12px", borderRadius:8, background:COLORS.accentGlow, border:`1px solid ${COLORS.accentDim}` }}>
+                <div style={{ fontSize:12, color:COLORS.accent, fontWeight:600 }}>
+                  → Nouveau stock après rangement : {(ITEMS.find(i=>i.sku===rangementModal.sku)?.stock_net || 0) + (rangementModal.qty_recue || rangementModal.qty)} unités
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={()=>setRangementModal(null)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:13 }}>Annuler</button>
+              <button onClick={handleConfirmRangement}
+                style={{ padding:"8px 20px", borderRadius:8, border:"none", background:`linear-gradient(135deg, ${COLORS.warning}, #D97706)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                Confirmer le rangement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }`}</style>
     </div>
   );
 };
@@ -2825,7 +3152,7 @@ export default function App() {
 
   const dataValue = useMemo(() => ({
     pos, tasks, events, statusHistory, counts, transitionPO, createPO, setActivePage, confirmAction,
-    setSlideOver, setExpandedKPI, setCounts, setTasks, addEvent, showToast,
+    setSlideOver, setExpandedKPI, setCounts, setTasks, addEvent, showToast, setPos,
   }), [pos, tasks, events, statusHistory, counts, transitionPO, createPO, confirmAction]);
 
   const openTaskCount = tasks.filter(t => t.status === "Ouverte").length;
