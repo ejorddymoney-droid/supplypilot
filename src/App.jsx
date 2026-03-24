@@ -48,8 +48,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activePage, setActivePage] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isDark, setIsDark] = useState(true);
-  const COLORS = isDark ? THEMES.dark : THEMES.light;
+  const COLORS = THEMES.dark;
 
   // Mutable state
   const [pos, setPos] = useState(INITIAL_POS);
@@ -267,15 +266,13 @@ export default function App() {
     <ThemeContext.Provider value={COLORS}>
     <AuthContext.Provider value={authValue}>
     <DataContext.Provider value={dataValue}>
-    <div style={{ display: "flex", height: "100vh", fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif", background: COLORS.bg, color: COLORS.text, overflow: "hidden", transition: "background 0.35s ease, color 0.35s ease" }}>
+    <div style={{ display: "flex", height: "100vh", fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif", background: COLORS.meshBg, color: COLORS.text, overflow: "hidden" }}>
       <Sidebar
         currentUser={currentUser}
         activePage={activePage}
         setActivePage={setActivePage}
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
-        isDark={isDark}
-        setIsDark={setIsDark}
         badgeCounts={badgeCounts}
         onLogout={handleLogout}
       />
@@ -319,15 +316,17 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: ${COLORS.bg}; }
-        ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: ${COLORS.borderLight}; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
         button { font-family: inherit; }
         input { font-family: inherit; }
         input::placeholder { color: ${COLORS.textDim}; }
         @keyframes slideIn { from { transform: translateX(100px); opacity:0; } to { transform: translateX(0); opacity:1; } }
         @keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
         @keyframes kpiExpand { from { opacity:0; transform: scale(0.97); } to { opacity:1; transform: scale(1); } }
+        @keyframes fadeUp { from { opacity:0; transform: translateY(16px) scale(0.97); } to { opacity:1; transform: translateY(0) scale(1); } }
+        @keyframes glowPulse { 0%, 100% { opacity:1; } 50% { opacity:0.7; } }
       `}</style>
     </div>
     </DataContext.Provider>

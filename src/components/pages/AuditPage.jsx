@@ -29,7 +29,7 @@ const AuditPage = () => {
           <thead><tr><SE col="date">Date</SE><SE col="level">Niveau</SE><SE col="type_event">Type</SE><SE col="utilisateur">Utilisateur</SE><SE col="entite">Entité</SE><SE col="entite_id">ID</SE><SE col="details">Détails</SE></tr></thead>
           <tbody>
             {filtered.map(e => (
-              <tr key={e.event_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:e,type:"event"})} onMouseEnter={ev=>ev.currentTarget.style.background=COLORS.cardHover} onMouseLeave={ev=>ev.currentTarget.style.background="transparent"}>
+              <tr key={e.event_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:e,type:"event"})} onMouseEnter={ev=>ev.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={ev=>ev.currentTarget.style.background="transparent"}>
                 <td style={{ padding:"10px 12px", fontSize:12, color:COLORS.textMuted, whiteSpace:"nowrap" }}>{e.date}</td>
                 <td style={{ padding:"10px 12px" }}><Badge>{e.level}</Badge></td>
                 <td style={{ padding:"10px 12px", fontSize:12, fontWeight:500 }}>{e.type_event}</td>
@@ -50,7 +50,7 @@ const AuditPage = () => {
             <thead><tr><SH col="po_id">PO ID</SH><SH col="old_status">Ancien statut</SH><SH col="new_status">Nouveau statut</SH><SH col="changed_by">Par</SH><SH col="changed_at">Date</SH><SH col="comment">Commentaire</SH></tr></thead>
             <tbody>
               {sortedHistory.map(h => (
-                <tr key={h.id} onMouseEnter={ev=>ev.currentTarget.style.background=COLORS.cardHover} onMouseLeave={ev=>ev.currentTarget.style.background="transparent"}>
+                <tr key={h.id} onMouseEnter={ev=>ev.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={ev=>ev.currentTarget.style.background="transparent"}>
                   <td style={{ padding:"10px 12px", fontWeight:600, color:COLORS.accent }}>PO-{String(h.po_id).padStart(4,'0')}</td>
                   <td style={{ padding:"10px 12px" }}>{h.old_status ? <Badge>{h.old_status}</Badge> : <span style={{ color:COLORS.textDim }}>—</span>}</td>
                   <td style={{ padding:"10px 12px" }}><Badge>{h.new_status}</Badge></td>

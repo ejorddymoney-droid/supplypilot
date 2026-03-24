@@ -26,7 +26,7 @@ const ImportModal = ({ type, onClose, onImport }) => {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1005 }}
       role="dialog" aria-label="Importer CSV" aria-modal="true">
-      <div style={{ width: 600, maxHeight: "80vh", overflowY: "auto", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+      <div style={{ width: 600, maxHeight: "80vh", overflowY: "auto", background: "rgba(15,20,35,0.9)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text, marginBottom: 8 }}>Importer des données CSV</div>
         <div style={{ fontSize: 12, color: COLORS.textDim, marginBottom: 16 }}>{hints}</div>
         <textarea value={text} onChange={e => setText(e.target.value)} rows={8}

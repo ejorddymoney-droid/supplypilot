@@ -35,15 +35,19 @@ const DashboardPage = () => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* KPI Row */}
+      {/* KPI Row — staggered entrance */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-        <KpiCard label="Articles actifs" value={KPIS.total_items} sub={`${KPIS.nb_a}A / ${KPIS.nb_b}B / ${KPIS.nb_c}C`} color={COLORS.accent} onClick={() => setActivePage("inventory")} />
-        <KpiCard label="Taux de service" value={`${KPIS.taux_service}%`} sub={`${KPIS.articles_sous_seuil} sous seuil`} color={KPIS.taux_service > 85 ? COLORS.accent : COLORS.warning} trend={-2.3} onClick={() => setActivePage("critical")} />
-        <KpiCard label="Articles critiques" value={KPIS.critiques} sub="Priorité haute A/B" color={COLORS.danger} onClick={() => setActivePage("critical")} />
-        <KpiCard label="Couverture moy." value={`${KPIS.couverture_moyenne}j`} sub="Objectif > 30 jours" color={COLORS.info} onClick={() => setActivePage("inventory")} />
-        <KpiCard label="PO à traiter" value={poToProcess} sub={`${openTasks} tâches ouvertes`} color={COLORS.warning} onClick={() => setActivePage("orders")} />
-        <KpiCard label="Alertes actives" value={KPIS.alertes_total} sub={`${KPIS.violations_regles} violations règles`} color={COLORS.danger} onClick={() => setActivePage("audit")} />
-        <KpiCard label="Précision inventaire" value={`${precisionValue.toFixed(1)}%`} sub={`${counts.filter(c => c.date >= "2026-03-01").length} comptages ce mois`} color={precisionValue >= 95 ? COLORS.accent : precisionValue >= 85 ? COLORS.warning : COLORS.danger} onClick={() => setActivePage("cyclecount")} />
+        {[
+          <KpiCard key="k1" label="Articles actifs" value={KPIS.total_items} sub={`${KPIS.nb_a}A / ${KPIS.nb_b}B / ${KPIS.nb_c}C`} color={COLORS.accent} onClick={() => setActivePage("inventory")} />,
+          <KpiCard key="k2" label="Taux de service" value={`${KPIS.taux_service}%`} sub={`${KPIS.articles_sous_seuil} sous seuil`} color={KPIS.taux_service > 85 ? COLORS.accent : COLORS.warning} trend={-2.3} onClick={() => setActivePage("critical")} />,
+          <KpiCard key="k3" label="Articles critiques" value={KPIS.critiques} sub="Priorité haute A/B" color={COLORS.danger} onClick={() => setActivePage("critical")} />,
+          <KpiCard key="k4" label="Couverture moy." value={`${KPIS.couverture_moyenne}j`} sub="Objectif > 30 jours" color={COLORS.info} onClick={() => setActivePage("inventory")} />,
+          <KpiCard key="k5" label="PO à traiter" value={poToProcess} sub={`${openTasks} tâches ouvertes`} color={COLORS.warning} onClick={() => setActivePage("orders")} />,
+          <KpiCard key="k6" label="Alertes actives" value={KPIS.alertes_total} sub={`${KPIS.violations_regles} violations règles`} color={COLORS.danger} onClick={() => setActivePage("audit")} />,
+          <KpiCard key="k7" label="Précision inventaire" value={`${precisionValue.toFixed(1)}%`} sub={`${counts.filter(c => c.date >= "2026-03-01").length} comptages ce mois`} color={precisionValue >= 95 ? COLORS.accent : precisionValue >= 85 ? COLORS.warning : COLORS.danger} onClick={() => setActivePage("cyclecount")} />,
+        ].map((card, i) => (
+          <div key={i} style={{ animation: `fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both`, animationDelay: `${i * 60}ms` }}>{card}</div>
+        ))}
       </div>
 
       {/* Charts Row 1 */}
@@ -51,8 +55,8 @@ const DashboardPage = () => {
         <Card title="Distribution ABC — Pareto" headerRight={<span style={{ fontSize: 11, color: COLORS.textDim }}>400 articles</span>} onTitleClick={() => setExpandedKPI("abc")}>
           <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={ABC_DATA}>
-              <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} />
-              <XAxis dataKey="classe" tick={{ fill: COLORS.textMuted, fontSize: 12 }} axisLine={{ stroke: COLORS.border }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+              <XAxis dataKey="classe" tick={{ fill: COLORS.textMuted, fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} />
               <YAxis yAxisId="left" tick={{ fill: COLORS.textMuted, fontSize: 11 }} axisLine={false} />
               <YAxis yAxisId="right" orientation="right" tick={{ fill: COLORS.textMuted, fontSize: 11 }} axisLine={false} unit="%" />
               <Tooltip content={<CustomTooltip />} />
@@ -67,8 +71,8 @@ const DashboardPage = () => {
         <Card title="Couverture stock (jours)" headerRight={<span style={{ fontSize: 11, color: COLORS.textDim }}>Distribution</span>} onTitleClick={() => setExpandedKPI("couverture")}>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={COVERAGE_DIST}>
-              <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} />
-              <XAxis dataKey="range" tick={{ fill: COLORS.textMuted, fontSize: 11 }} axisLine={{ stroke: COLORS.border }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+              <XAxis dataKey="range" tick={{ fill: COLORS.textMuted, fontSize: 11 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} />
               <YAxis tick={{ fill: COLORS.textMuted, fontSize: 11 }} axisLine={false} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="count" name="Articles" radius={[6, 6, 0, 0]} barSize={40}>
@@ -84,7 +88,7 @@ const DashboardPage = () => {
         <Card title="Valeur annuelle par famille" onTitleClick={() => setExpandedKPI("familles")}>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={FAMILLES} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
               <XAxis type="number" tick={{ fill: COLORS.textMuted, fontSize: 10 }} axisLine={false} tickFormatter={v => fmtM(v)} />
               <YAxis type="category" dataKey="name" tick={{ fill: COLORS.textMuted, fontSize: 11 }} axisLine={false} width={95} />
               <Tooltip content={<CustomTooltip />} formatter={v => fmtM(v)} />
@@ -169,13 +173,13 @@ const DashboardPage = () => {
       <Card title="Performance fournisseurs">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
           {SUPPLIERS.map(s => (
-            <div key={s.id} style={{ background: COLORS.surface, borderRadius: 12, padding: 16, border: `1px solid ${COLORS.border}` }}>
+            <div key={s.id} style={{ background: "rgba(255,255,255,0.03)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,0.06)", transition: "border-color 0.2s, box-shadow 0.2s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{s.nom.split(' ')[0]}</span>
                 <Badge>{s.statut}</Badge>
               </div>
               <div style={{ fontSize: 11, color: COLORS.textDim, marginBottom: 4 }}>Conformité</div>
-              <div style={{ background: COLORS.bg, borderRadius: 6, height: 6, overflow: "hidden", marginBottom: 8 }}>
+              <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 6, overflow: "hidden", marginBottom: 8 }}>
                 <div style={{ width: `${s.taux_conformite}%`, height: "100%", background: s.taux_conformite > 90 ? COLORS.accent : s.taux_conformite > 80 ? COLORS.warning : COLORS.danger, borderRadius: 6, transition: "width 0.3s" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>

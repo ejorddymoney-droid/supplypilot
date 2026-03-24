@@ -38,7 +38,7 @@ const GaugeChart = ({ value, label, color, size=140 }) => {
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
       <svg width={size} height={size*0.7} viewBox={`0 0 ${size} ${size*0.75}`}>
-        <path d={arcPath(startAngle, endAngle, radius)} fill="none" stroke={COLORS.border} strokeWidth="10" strokeLinecap="round"/>
+        <path d={arcPath(startAngle, endAngle, radius)} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="10" strokeLinecap="round"/>
         <path d={arcPath(startAngle, valueAngle, radius)} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"/>
         <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke={COLORS.text} strokeWidth="2.5" strokeLinecap="round"/>
         <circle cx={cx} cy={cy} r="4" fill={COLORS.text}/>
@@ -68,7 +68,7 @@ const TRSPage = () => {
       <span style={{ fontSize:13, color:COLORS.textMuted }}>{label}</span>
       <div style={{ display:"flex", alignItems:"center", gap:6 }}>
         <input type="number" value={inputs[field]} onChange={e=>update(field, e.target.value)}
-          style={{ width:80, padding:"5px 10px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.accent, fontSize:14, fontWeight:700, textAlign:"right", outline:"none" }}
+          style={{ width:80, padding:"5px 10px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"rgba(255,255,255,0.03)", color:COLORS.accent, fontSize:14, fontWeight:700, textAlign:"right", outline:"none" }}
           onFocus={e=>e.target.style.borderColor=COLORS.accent} onBlur={e=>e.target.style.borderColor=COLORS.border}/>
         {unit && <span style={{ fontSize:11, color:COLORS.textDim, width:16 }}>{unit}</span>}
       </div>
@@ -127,8 +127,8 @@ const TRSPage = () => {
       <Card title="Tendance mensuelle (6 mois)" headerRight={<ExportButton data={TRS_MONTHLY} columns={[{key:"mois",label:"Mois"},{key:"dispo",label:"Disponibilité %"},{key:"perf",label:"Performance %"},{key:"qual",label:"Qualité %"},{key:"trs",label:"TRS %"}]} filename="trs_tendance"/>}>
         <ResponsiveContainer width="100%" height={260}>
           <ComposedChart data={TRS_MONTHLY}>
-            <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border}/>
-            <XAxis dataKey="mois" tick={{ fill:COLORS.textMuted, fontSize:12 }} axisLine={{ stroke:COLORS.border }}/>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)"/>
+            <XAxis dataKey="mois" tick={{ fill:COLORS.textMuted, fontSize:12 }} axisLine={{ stroke:"rgba(255,255,255,0.06)" }}/>
             <YAxis domain={[60,100]} tick={{ fill:COLORS.textMuted, fontSize:11 }} axisLine={false} unit="%"/>
             <Tooltip content={<CustomTooltip/>}/>
             <Legend wrapperStyle={{ fontSize:11, color:COLORS.textMuted }}/>
@@ -151,7 +151,7 @@ const TRSPage = () => {
                 const lvl = m.trs >= 85 ? "World Class" : m.trs >= 75 ? "Bon" : m.trs >= 60 ? "Acceptable" : "Critique";
                 const lc = m.trs >= 85 ? COLORS.accent : m.trs >= 75 ? COLORS.info : m.trs >= 60 ? COLORS.warning : COLORS.danger;
                 return (
-                  <tr key={m.mois} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <tr key={m.mois} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <Td style={{ fontWeight:600 }}>{m.mois}</Td>
                     <Td>{m.dispo}%</Td>
                     <Td>{m.perf}%</Td>
@@ -173,14 +173,14 @@ const TRSPage = () => {
               { name:"Qualité", formula:"(Qté totale − Qté rejetée) / Qté totale", desc:"Part de production conforme sans reprise ni rebut" },
               { name:"TRS", formula:"Disponibilité × Performance × Qualité", desc:"Indicateur synthétique de l'efficacité globale de l'équipement" },
             ].map(f => (
-              <div key={f.name} style={{ background:COLORS.surface, borderRadius:10, padding:14, border:`1px solid ${COLORS.border}` }}>
+              <div key={f.name} style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:14, border:`1px solid ${COLORS.border}` }}>
                 <div style={{ fontWeight:700, color:COLORS.accent, marginBottom:4, fontSize:13 }}>{f.name}</div>
                 <div style={{ fontFamily:"'Courier New', monospace", fontSize:12, color:COLORS.text, padding:"6px 10px", background:COLORS.bg, borderRadius:6, marginBottom:6, border:`1px solid ${COLORS.border}` }}>{f.formula}</div>
                 <div style={{ fontSize:11, color:COLORS.textDim }}>{f.desc}</div>
               </div>
             ))}
 
-            <div style={{ background:COLORS.surface, borderRadius:10, padding:14, border:`1px solid ${COLORS.border}`, marginTop:4 }}>
+            <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:14, border:`1px solid ${COLORS.border}`, marginTop:4 }}>
               <div style={{ fontWeight:700, color:COLORS.text, marginBottom:8, fontSize:13 }}>Repères industriels</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
                 {[

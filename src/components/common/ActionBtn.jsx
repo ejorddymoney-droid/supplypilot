@@ -26,6 +26,8 @@ const ActionBtn = ({ onClick, borderColor, bgColor, textColor, children }) => {
         fontSize:10, fontWeight:600, cursor: state==="idle" ? "pointer" : "default",
         transition:"all 0.2s", minWidth:70, textAlign:"center",
         opacity: state==="loading" ? 0.6 : 1,
+        backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)",
+        boxShadow: state==="done" ? "0 0 16px rgba(16,185,129,0.2)" : "none",
       }}
     >
       {state === "loading" ? "\u2026" : state === "done" ? "\u2713 OK" : children}

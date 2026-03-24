@@ -61,8 +61,8 @@ const SlideOver = ({ data, type, onClose }) => {
       role="dialog" aria-label={title} aria-modal="true">
       <div style={{ flex: 1 }} />
       <div onClick={e => e.stopPropagation()} style={{
-        width: 440, background: COLORS.card, borderLeft: `1px solid ${COLORS.border}`, height: "100%",
-        boxShadow: "-10px 0 40px rgba(0,0,0,0.3)", overflowY: "auto", animation: "slideRight 0.25s ease",
+        width: 440, background: "rgba(12,16,28,0.92)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", borderLeft: "1px solid rgba(255,255,255,0.06)", height: "100%",
+        boxShadow: "-10px 0 40px rgba(0,0,0,0.4)", overflowY: "auto", animation: "slideRight 0.25s ease",
       }}>
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: COLORS.card, zIndex: 1 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>{title}</div>

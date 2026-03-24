@@ -23,16 +23,16 @@ const Header = ({ activePage, onOpenSearch, notifications, setNotifications, cur
   const unreadCount = myNotifs.filter(n => !n.read).length;
 
   return (
-    <header style={{ padding:"16px 28px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", background:COLORS.surface, flexShrink:0, transition:"background 0.35s, border-color 0.35s" }}>
+    <header style={{ padding:"16px 28px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"space-between", background:"rgba(255,255,255,0.02)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", flexShrink:0 }}>
       <div>
-        <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-0.02em" }}>{PAGE_TITLES[activePage]}</h1>
+        <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-0.02em", textShadow:"0 0 30px rgba(255,255,255,0.04)" }}>{PAGE_TITLES[activePage]}</h1>
         <div style={{ fontSize:12, color:COLORS.textDim, marginTop:2 }}>{TODAY_DISPLAY} — {QUARTER} · <span style={{ opacity:0.5 }}>{APP_VERSION}</span></div>
       </div>
       <div style={{ display:"flex", alignItems:"center", gap:12 }}>
         <button onClick={onOpenSearch} aria-label="Ouvrir la recherche globale"
-          style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 14px", borderRadius:10, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.textMuted, fontSize:12, cursor:"pointer", transition:"border-color 0.2s", minWidth:180, justifyContent:"space-between" }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = COLORS.accent}
-          onMouseLeave={e => e.currentTarget.style.borderColor = COLORS.border}>
+          style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 14px", borderRadius:10, border:"1px solid rgba(255,255,255,0.08)", background:"rgba(255,255,255,0.04)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", color:COLORS.textMuted, fontSize:12, cursor:"pointer", transition:"border-color 0.2s, box-shadow 0.2s", minWidth:180, justifyContent:"space-between" }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = COLORS.accent; e.currentTarget.style.boxShadow = "0 0 12px rgba(16,185,129,0.1)"; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.boxShadow = "none"; }}>
           <span style={{ display:"flex", alignItems:"center", gap:6 }}><Icon name="search" size={14}/>Rechercher...</span>
           <kbd style={{ padding:"1px 6px", borderRadius:4, background:COLORS.bg, fontSize:10, color:COLORS.textDim, border:`1px solid ${COLORS.border}` }}>⌘K</kbd>
         </button>
@@ -45,7 +45,7 @@ const Header = ({ activePage, onOpenSearch, notifications, setNotifications, cur
             {unreadCount > 0 && <div style={{ position:"absolute", top:-4, right:-4, minWidth:16, height:16, borderRadius:8, background:COLORS.danger, color:"white", fontSize:9, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px" }} role="status">{unreadCount}</div>}
           </button>
           {showNotifs && (
-            <div style={{ position:"absolute", top:36, right:0, width:360, maxHeight:400, overflowY:"auto", background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:14, boxShadow:"0 12px 40px rgba(0,0,0,0.3)", zIndex:1002 }} role="dialog" aria-label="Notifications">
+            <div style={{ position:"absolute", top:36, right:0, width:360, maxHeight:400, overflowY:"auto", background:"rgba(15,20,35,0.9)", backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, boxShadow:"0 12px 40px rgba(0,0,0,0.5)", zIndex:1002 }} role="dialog" aria-label="Notifications">
               <div style={{ padding:"14px 18px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <span style={{ fontSize:14, fontWeight:700, color:COLORS.text }}>Notifications ({unreadCount})</span>
                 {unreadCount > 0 && <button onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))} style={{ fontSize:10, color:COLORS.accent, background:"transparent", border:"none", cursor:"pointer" }}>Tout marquer lu</button>}
@@ -70,7 +70,9 @@ const Header = ({ activePage, onOpenSearch, notifications, setNotifications, cur
 
         {currentUser?.role === "admin" && (
           <button onClick={() => setActivePage("critical")}
-            style={{ padding:"8px 18px", borderRadius:10, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", letterSpacing:"0.01em" }}>
+            style={{ padding:"8px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #10B981, #059669)", color:"white", fontSize:13, fontWeight:600, cursor:"pointer", letterSpacing:"0.01em", boxShadow:"0 0 20px rgba(16,185,129,0.3), 0 4px 12px rgba(0,0,0,0.2)", transition:"box-shadow 0.2s" }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = "0 0 30px rgba(16,185,129,0.45), 0 6px 16px rgba(0,0,0,0.3)"}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = "0 0 20px rgba(16,185,129,0.3), 0 4px 12px rgba(0,0,0,0.2)"}>
             + Nouveau PO
           </button>
         )}

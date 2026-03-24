@@ -15,7 +15,7 @@ const DocumentAttachModal = ({ po, onClose, onAttach }) => {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1005 }}
       role="dialog" aria-label="Joindre des documents" aria-modal="true">
-      <div style={{ width: 460, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+      <div style={{ width: 460, background: "rgba(15,20,35,0.9)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>Joindre des documents</div>
         <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 20 }}>PO : <strong style={{ color: COLORS.accent }}>{po.po_number}</strong> — {po.article}</div>
         <label htmlFor="doc-upload" style={{ display: "block", padding: "20px", borderRadius: 12, border: `2px dashed ${COLORS.border}`, textAlign: "center", cursor: "pointer", marginBottom: 16, transition: "border-color 0.2s" }}

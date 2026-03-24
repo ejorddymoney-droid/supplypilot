@@ -84,7 +84,7 @@ const SettingsPage = () => {
     <div style={{ marginBottom:12 }}>
       <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:4 }}>{label}</label>
       <input value={value} onChange={onChange} type={type} placeholder={placeholder}
-        style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}/>
+        style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"rgba(255,255,255,0.03)", color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}/>
     </div>
   );
 
@@ -99,7 +99,7 @@ const SettingsPage = () => {
         <Card title={`Moteur de règles — ${rules.length} garde-fous`}>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             {rules.map(r => (
-              <div key={r.id} style={{ background:COLORS.surface, borderRadius:12, padding:16, border:`1px solid ${COLORS.border}`, display:"flex", gap:16, alignItems:"flex-start" }}>
+              <div key={r.id} style={{ background:"rgba(255,255,255,0.03)", borderRadius:12, padding:16, border:`1px solid ${COLORS.border}`, display:"flex", gap:16, alignItems:"flex-start" }}>
                 <div style={{ width:40, height:40, borderRadius:10, background:COLORS.accentGlow, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:16, fontWeight:700, color:COLORS.accent }}>{r.id}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:600, color:COLORS.text, marginBottom:6 }}>{r.name}</div>
@@ -118,7 +118,7 @@ const SettingsPage = () => {
         <Card title={`Formules — ${formulas.length} calculs`}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
             {formulas.map(f => (
-              <div key={f.name} style={{ background:COLORS.surface, borderRadius:12, padding:16, border:`1px solid ${COLORS.border}` }}>
+              <div key={f.name} style={{ background:"rgba(255,255,255,0.03)", borderRadius:12, padding:16, border:`1px solid ${COLORS.border}` }}>
                 <div style={{ fontWeight:700, color:COLORS.accent, marginBottom:6, fontSize:14 }}>{f.name}</div>
                 <div style={{ fontFamily:"'Courier New', monospace", fontSize:13, color:COLORS.text, marginBottom:8, padding:"8px 12px", background:COLORS.bg, borderRadius:8, border:`1px solid ${COLORS.border}` }}>{f.formula}</div>
                 <div style={{ fontSize:12, color:COLORS.textDim }}>{f.desc}</div>
@@ -135,7 +135,7 @@ const SettingsPage = () => {
             <thead><tr><Th>KPI</Th><Th>Définition</Th><Th>Cible</Th><Th>Page</Th></tr></thead>
             <tbody>
               {kpiDefs.map(k => (
-                <tr key={k.name} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <tr key={k.name} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <Td style={{ fontWeight:600, color:COLORS.accent, whiteSpace:"nowrap" }}>{k.name}</Td>
                   <Td style={{ fontSize:12, color:COLORS.textMuted, maxWidth:400 }}>{k.def}</Td>
                   <Td style={{ fontWeight:600, color:COLORS.accent, whiteSpace:"nowrap" }}>{k.cible}</Td>
@@ -155,7 +155,7 @@ const SettingsPage = () => {
               <thead><tr><Th>Utilisateur</Th><Th>Nom complet</Th><Th>Poste</Th><Th>Rôle</Th><Th>Pages accessibles</Th></tr></thead>
               <tbody>
                 {USERS.map(u => (
-                  <tr key={u.id} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <tr key={u.id} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <Td>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                         <div style={{ width:30, height:30, borderRadius:8, background:`linear-gradient(135deg, ${u.color}, ${u.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:700, fontSize:11 }}>{u.initials}</div>
@@ -186,7 +186,7 @@ const SettingsPage = () => {
                   {page:"Inventaire tournant",admin:true,entrepot:true},{page:"Mes statistiques",admin:false,entrepot:true},
                   {page:"Règles / Config",admin:true,entrepot:false},
                 ].map(p => (
-                  <tr key={p.page} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <tr key={p.page} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <Td style={{ fontWeight:500 }}>{p.page}</Td>
                     <Td>{p.admin ? <span style={{ color:COLORS.accent }}>{"✓"}</span> : <span style={{ color:COLORS.textDim }}>{"—"}</span>}</Td>
                     <Td>{p.entrepot ? <span style={{ color:COLORS.accent }}>{"✓"}</span> : <span style={{ color:COLORS.textDim }}>{"—"}</span>}</Td>

@@ -4,6 +4,59 @@
 
 ---
 
+## v3.0.0 — Glassmorphism Dark Redesign
+**Date** : 2026-03-24
+**Fichiers** : ~30 fichiers modifiés (styles-only, zero logic changes)
+**Version précédente** : v2.9.1
+**Résumé** : Refonte visuelle complète — thème glassmorphism dark immersif avec effets de verre dépoli, gradient mesh background, ombres lumineuses colorées sur les KPIs, animations d'entrée échelonnées, et suppression du mode clair.
+
+### Changements visuels majeurs
+
+| Élément | Avant | Après |
+|---------|-------|-------|
+| **Background** | Couleur plate `#0B0F1A` | Gradient mesh (3 orbes radiaux emeraude/bleu/violet) sur `#080B14` |
+| **Cards** | Fond solide `#1A2035`, bordure solide | Fond `rgba(255,255,255,0.04)` + `backdrop-filter: blur(16px)` + bordure rgba |
+| **KPI Cards** | Pas d'ombre, hover translateY | Ombre lumineuse colorée par KPI + hover scale(1.02) + bandeau gradient supérieur |
+| **Sidebar** | Fond solide `#111827` | Verre dépoli blur(20px) + navigation active avec glow |
+| **Header** | Fond solide | Verre dépoli + bouton CTA avec ombre lumineuse verte |
+| **Tables** | Conteneur sans fond | Conteneur verre avec blur(12px) + séparateurs ultra-fins rgba(0.04) |
+| **Tooltips** | Fond solide card | Verre dépoli rgba(15,20,35,0.85) + blur(20px) |
+| **Modals** | Fond solide | Verre dépoli rgba(15,20,35,0.9) + blur(24px) + backdrop blur(4px) |
+| **Badges** | Standard | + backdrop-filter blur(8px) + animation glowPulse sur CRITICAL |
+| **Inputs** | Fond surface | Verre rgba(0.04) + focus ring accent glow |
+| **Toast** | Fond solide | Verre + ombre lumineuse sémantique (vert succès, rouge erreur) |
+| **Mode clair** | Toggle dark/light | **Supprimé** — dark-only |
+
+### Animations ajoutées
+
+| Animation | Usage |
+|-----------|-------|
+| `fadeUp` | Entrée échelonnée des KPI cards du dashboard (60ms entre chaque) |
+| `glowPulse` | Pulsation des badges CRITICAL |
+
+### Tokens ajoutés (themes.js)
+
+- `glass` : `{ bg, bgHover, blur, blurHeavy, border, borderHover, borderHighlight, innerShadow }`
+- `glow` : Ombres lumineuses par couleur sémantique (accent, danger, warning, info, purple) + variantes hover
+- `meshBg` : Gradient mesh composé de 3 `radial-gradient` + 1 `linear-gradient`
+
+### Tokens ajoutés (tokens.js)
+
+- `shadow.glass` / `shadow.glassHover`
+- `transition.spring` (cubic-bezier bounce)
+- `animation.staggerBase` / `entranceDuration` / `entranceEasing`
+- `fontWeight.light` (300)
+- `radius.2xl` (20)
+
+### Ce qui n'a PAS changé
+
+- Toute la logique métier, navigation, authentification, workflow PO
+- Les garde-fous et le moteur de règles
+- Les attributs d'accessibilité WCAG (ajoutés en v2.9.1)
+- Les structures de données et constantes
+
+---
+
 ## v2.9.1 — Refactoring architectural : monolithe → architecture modulaire
 **Date** : 2026-03-24
 **Fichiers** : 48 fichiers dans `src/` (remplace le monolithe `App.jsx` de 4 348 lignes)
@@ -543,5 +596,6 @@ DashboardPage, CriticalPage, PurchaseOrdersPage, TasksPage, AuditPage — tous m
 | v2.0.0 | KPI Expand Overlay | ~2 207 | 1 |
 | v2.1.0 | Module Inventaire Tournant | ~2 731 | 1 |
 | v2.9.1 | Refactoring modulaire + a11y | ~2 800 | 48 |
+| v3.0.0 | Glassmorphism Dark Redesign | ~2 800 | 48 |
 
-**Version courante : v2.9.1**
+**Version courante : v3.0.0**

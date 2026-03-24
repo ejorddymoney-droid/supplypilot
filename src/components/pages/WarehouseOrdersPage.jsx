@@ -59,7 +59,7 @@ const WarehouseOrdersPage = () => {
           <thead><tr><S col="po_number">PO</S><S col="article">Article</S><Th>Fournisseur</Th><S col="qty">Qty</S><S col="statut">Statut</S><S col="date_creation">Créé le</S><Th>Actions</Th></tr></thead>
           <tbody>
             {warehousePOs.map(po => (
-              <tr key={po.po_id} onMouseEnter={e => e.currentTarget.style.background = COLORS.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <tr key={po.po_id} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                 <Td style={{ fontWeight: 700, color: COLORS.accent }}>{po.po_number}</Td>
                 <Td><span style={{ fontWeight: 500 }}>{po.article}</span><br /><span style={{ fontSize: 11, color: COLORS.textDim }}>{po.sku}</span></Td>
                 <Td style={{ color: COLORS.textMuted }}>{SUPPLIER_MAP[po.supplier_id]?.split(' ')[0]}</Td>
@@ -80,19 +80,19 @@ const WarehouseOrdersPage = () => {
 
       {receptionModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1005 }} role="dialog" aria-label="Réception PO" aria-modal="true">
-          <div style={{ width: 480, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+          <div style={{ width: 480, background: "rgba(15,20,35,0.9)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>Réception — {receptionModal.po_number}</div>
             <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 20 }}>{receptionModal.article} — Qty commandée : {receptionModal.qty}</div>
             <div style={{ marginBottom: 16 }}>
               <label htmlFor="qty-recue" style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 4 }}>Quantité reçue</label>
               <input id="qty-recue" type="number" value={receptionForm.qtyRecue} onChange={e => setReceptionForm(f => ({ ...f, qtyRecue: e.target.value }))}
                 placeholder={String(receptionModal.qty)}
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: "rgba(255,255,255,0.03)", color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
             <div style={{ marginBottom: 20 }}>
               <label htmlFor="probleme" style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 4 }}>Problème de réception</label>
               <select id="probleme" value={receptionForm.probleme} onChange={e => setReceptionForm(f => ({ ...f, probleme: e.target.value }))}
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: "rgba(255,255,255,0.03)", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
                 {["Aucun — conforme", "Quantité inférieure", "Quantité supérieure", "Dommages constatés", "Mauvais article", "Emballage endommagé"].map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>

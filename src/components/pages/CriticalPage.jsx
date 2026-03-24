@@ -30,7 +30,7 @@ const CriticalPage = () => {
           </thead>
           <tbody>
             {sorted.map(it => (
-              <tr key={it.id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:it,type:"item"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <tr key={it.id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:it,type:"item"})} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{ padding:"10px 12px", fontWeight:600, color:COLORS.accent, fontSize:12 }}>{it.sku}</td>
                 <td style={{ padding:"10px 12px", fontWeight:500 }}>{it.article}</td>
                 <td style={{ padding:"10px 12px", color:COLORS.textMuted }}>{it.famille}</td>

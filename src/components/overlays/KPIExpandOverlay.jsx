@@ -13,9 +13,9 @@ const KPIExpandOverlay = ({ kpiId, onClose }) => {
   if (!kpiId) return null;
 
   const Wrap = ({ title, children }) => (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1003, background: COLORS.bg, overflowY: "auto", animation: "kpiExpand 0.25s ease" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 1003, background: COLORS.meshBg, overflowY: "auto", animation: "kpiExpand 0.25s ease" }}
       role="dialog" aria-label={title} aria-modal="true">
-      <div style={{ position: "sticky", top: 0, zIndex: 2, background: COLORS.surface, borderBottom: `1px solid ${COLORS.border}`, padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 2, background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.text }}>{title}</div>
         <button onClick={onClose} style={{ padding: "6px 16px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.textMuted, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
           <span>Fermer</span><kbd style={{ padding: "1px 6px", borderRadius: 4, background: COLORS.bg, fontSize: 10, border: `1px solid ${COLORS.border}` }}>ESC</kbd>

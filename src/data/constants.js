@@ -1,6 +1,6 @@
 import { daysFromNow, TODAY } from '../utils/formatters';
 
-export const APP_VERSION = "v2.9.0";
+export const APP_VERSION = "v3.0.0";
 
 export const SUPPLIERS = [
   { id:1, nom:"AcierPlus Inc.", statut:"actif", delai_moyen:8, taux_conformite:94.2, taux_retard:6.1, pays:"Canada", email:"achat@acierplus.ca" },

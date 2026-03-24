@@ -17,7 +17,9 @@ const SearchInput = ({ value, onChange, placeholder = "Rechercher...", id = "glo
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ width:"100%", padding:"8px 12px 8px 36px", background:COLORS.surface, border:`1px solid ${COLORS.border}`, borderRadius:10, color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box" }}
+        style={{ width:"100%", padding:"8px 12px 8px 36px", background:"rgba(255,255,255,0.04)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box", transition:"border-color 0.2s, box-shadow 0.2s" }}
+        onFocus={e => { e.target.style.borderColor = COLORS.accent; e.target.style.boxShadow = "0 0 0 2px rgba(16,185,129,0.15)"; }}
+        onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
       />
     </div>
   );

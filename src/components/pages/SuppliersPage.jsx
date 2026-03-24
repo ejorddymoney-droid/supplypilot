@@ -39,7 +39,7 @@ const SuppliersPage = () => {
     <div style={{ marginBottom:12 }}>
       <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:4 }}>{label}</label>
       <input value={form[field]} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} type={type} placeholder={placeholder}
-        style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
+        style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"rgba(255,255,255,0.03)", color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
         onFocus={e=>e.target.style.borderColor=COLORS.accent} onBlur={e=>e.target.style.borderColor=COLORS.border}/>
     </div>
   );
@@ -69,7 +69,7 @@ const SuppliersPage = () => {
         </tr></thead>
         <tbody>
           {sorted.map(s => (
-            <tr key={s.id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:s,type:"supplier"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <tr key={s.id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:s,type:"supplier"})} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
               <td style={{ padding:"10px 12px", fontWeight:600 }}>{s.nom}</td>
               <td style={{ padding:"10px 12px" }}><Badge>{s.statut}</Badge></td>
               <td style={{ padding:"10px 12px", color:COLORS.textMuted }}>{s.pays}</td>

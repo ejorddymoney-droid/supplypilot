@@ -29,7 +29,7 @@ const TasksPage = () => {
               const po = pos.find(p=>p.po_id===t.related_po_id);
               const overdue = new Date(t.due_at) < new Date(TODAY) && t.status !== "Terminée";
               return (
-                <tr key={t.task_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:t,type:"task"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <tr key={t.task_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:t,type:"task"})} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <td style={{ padding:"10px 12px", fontWeight:500 }}>{t.type}</td>
                   <td style={{ padding:"10px 12px", color:COLORS.accent, fontWeight:600 }}>{po?.po_number||"—"}</td>
                   <td style={{ padding:"10px 12px" }}>{t.assigned_to}</td>

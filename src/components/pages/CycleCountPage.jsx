@@ -106,7 +106,7 @@ const CycleCountPage = () => {
             <thead><tr><Th>SKU</Th><Th>Article</Th><Th>ABC</Th><Th>Fréq.</Th><Th>Stock</Th><Th>Dernier comptage</Th><Th>Statut</Th></tr></thead>
             <tbody>
               {itemsToCount.slice(0, 30).map(it => (
-                <tr key={it.id} onMouseEnter={e => e.currentTarget.style.background = COLORS.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <tr key={it.id} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <Td style={{ color: COLORS.accent, fontWeight: 600, fontSize: 12 }}>{it.sku}</Td>
                   <Td style={{ fontWeight: 500 }}>{it.article}</Td>
                   <Td><Badge>{it.abc}</Badge></Td>
@@ -128,19 +128,19 @@ const CycleCountPage = () => {
               <label htmlFor="count-sku" style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 4 }}>SKU de l'article *</label>
               <input id="count-sku" value={countForm.sku} onChange={e => setCountForm(f => ({ ...f, sku: e.target.value.toUpperCase() }))}
                 placeholder="Ex: SKU-0003" list="sku-list"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: "rgba(255,255,255,0.03)", color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
               <datalist id="sku-list">{itemsToCount.filter(i => !i.alreadyCounted).slice(0, 20).map(i => <option key={i.sku} value={i.sku}>{i.article}</option>)}</datalist>
             </div>
             <div style={{ marginBottom: 16 }}>
               <label htmlFor="count-qty" style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 4 }}>Stock compté *</label>
               <input id="count-qty" type="number" value={countForm.stockCompte} onChange={e => setCountForm(f => ({ ...f, stockCompte: e.target.value }))}
                 placeholder="Quantité physique comptée"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: "rgba(255,255,255,0.03)", color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
             <div style={{ marginBottom: 16 }}>
               <label htmlFor="count-zone" style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 4 }}>Zone</label>
               <select id="count-zone" value={countForm.zone || ""} onChange={e => setCountForm(f => ({ ...f, zone: e.target.value }))}
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: "rgba(255,255,255,0.03)", color: COLORS.text, fontSize: 13, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
                 <option value="">Sélectionner...</option>
                 {ZONE_OPTIONS.map(z => <option key={z} value={z}>{z}</option>)}
               </select>
@@ -163,7 +163,7 @@ const CycleCountPage = () => {
                 const seuil = ECART_SEUILS[item?.abc || "C"];
                 const overSeuil = Math.abs(c.ecart_pct) > seuil;
                 return (
-                  <tr key={c.id} onMouseEnter={e => e.currentTarget.style.background = COLORS.cardHover} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <tr key={c.id} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <Td style={{ color: COLORS.accent, fontWeight: 600, fontSize: 12 }}>{c.sku}</Td>
                     <Td style={{ color: COLORS.textMuted, fontSize: 12 }}>{c.date}</Td>
                     <Td>{fmt(c.stock_systeme)}</Td>
@@ -186,8 +186,8 @@ const CycleCountPage = () => {
           <Card title="Précision mensuelle">
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={MONTHLY_PRECISION}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} />
-                <XAxis dataKey="mois" tick={{ fill: COLORS.textMuted, fontSize: 12 }} axisLine={{ stroke: COLORS.border }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="mois" tick={{ fill: COLORS.textMuted, fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} />
                 <YAxis domain={[80, 100]} tick={{ fill: COLORS.textMuted, fontSize: 11 }} axisLine={false} unit="%" />
                 <Tooltip content={<CustomTooltip />} />
                 <Line type="monotone" dataKey="precision" name="Précision %" stroke={COLORS.accent} strokeWidth={2.5} dot={{ fill: COLORS.accent, r: 5 }} />
@@ -197,7 +197,7 @@ const CycleCountPage = () => {
           <Card title="Seuils de tolérance par classe">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
               {["A", "B", "C"].map(c => (
-                <div key={c} style={{ background: COLORS.surface, borderRadius: 12, padding: 16, border: `1px solid ${COLORS.border}`, textAlign: "center" }}>
+                <div key={c} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 16, border: `1px solid ${COLORS.border}`, textAlign: "center" }}>
                   <Badge>{c}</Badge>
                   <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, margin: "12px 0" }}>{"±"}{ECART_SEUILS[c]}%</div>
                   <div style={{ fontSize: 12, color: COLORS.textMuted }}>Fréquence : {CYCLE_FREQ[c] === 1 ? "Mensuel" : `${CYCLE_FREQ[c]} mois`}</div>
@@ -240,7 +240,7 @@ const CycleCountPage = () => {
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 4 }}>Commentaire</label>
               <textarea value={countForm.comment} onChange={e => setCountForm(f => ({ ...f, comment: e.target.value }))} rows={2}
-                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 12, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "rgba(255,255,255,0.03)", color: COLORS.text, fontSize: 12, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => setShowQuestionnaire(null)} style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: "transparent", color: COLORS.textMuted, cursor: "pointer", fontSize: 13 }}>Annuler</button>

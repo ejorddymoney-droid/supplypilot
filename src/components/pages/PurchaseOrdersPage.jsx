@@ -74,7 +74,7 @@ const PurchaseOrdersPage = () => {
           <thead><tr><S col="po_number">PO #</S><S col="article">Article</S><S col="supplier_id">Fournisseur</S><S col="qty">Qty</S><S col="statut">Statut</S><S col="prix_negocie">Prix négocié</S><S col="prix_paye">Prix payé</S><S col="date_creation">Date création</S><S col="created_by">Créé par</S><th style={{ padding:"10px 12px" }}>Actions</th></tr></thead>
           <tbody>
             {filtered.map(po => (
-              <tr key={po.po_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:po,type:"po"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <tr key={po.po_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:po,type:"po"})} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{ padding:"10px 12px", fontWeight:700, color:COLORS.accent }}>{po.po_number}</td>
                 <td style={{ padding:"10px 12px" }}><span style={{ fontWeight:500 }}>{po.article}</span><br/><span style={{ fontSize:11, color:COLORS.textDim }}>{po.sku}</span></td>
                 <td style={{ padding:"10px 12px", color:COLORS.textMuted }}>{SUPPLIER_MAP[po.supplier_id]?.split(' ')[0]}</td>

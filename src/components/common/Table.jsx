@@ -1,7 +1,7 @@
 import { useTheme } from '../../contexts/ThemeContext';
 
 export const TableContainer = ({ children, label }) => (
-  <div style={{ overflowX:"auto", width:"100%" }} role="region" aria-label={label || "Table de donn\u00e9es"} tabIndex={0}>
+  <div style={{ overflowX:"auto", width:"100%", background:"rgba(255,255,255,0.02)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", borderRadius:12, border:"1px solid rgba(255,255,255,0.06)" }} role="region" aria-label={label || "Table de donn\u00e9es"} tabIndex={0}>
     <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>{children}</table>
   </div>
 );
@@ -12,7 +12,7 @@ export const Th = ({ children, style = {}, tip }) => {
     <th
       title={tip}
       scope="col"
-      style={{ textAlign:"left", padding:"10px 12px", color:COLORS.textMuted, fontWeight:600, fontSize:11, textTransform:"uppercase", letterSpacing:"0.06em", borderBottom:`1px solid ${COLORS.border}`, whiteSpace:"nowrap", cursor:tip?"help":"default", ...style }}
+      style={{ textAlign:"left", padding:"10px 12px", color:COLORS.textMuted, fontWeight:600, fontSize:11, textTransform:"uppercase", letterSpacing:"0.06em", borderBottom:"1px solid rgba(255,255,255,0.06)", whiteSpace:"nowrap", cursor:tip?"help":"default", ...style }}
     >
       {children}
     </th>
@@ -22,7 +22,7 @@ export const Th = ({ children, style = {}, tip }) => {
 export const Td = ({ children, style = {} }) => {
   const COLORS = useTheme();
   return (
-    <td style={{ padding:"10px 12px", color:COLORS.text, borderBottom:`1px solid ${COLORS.border}22`, whiteSpace:"nowrap", ...style }}>
+    <td style={{ padding:"10px 12px", color:COLORS.text, borderBottom:"1px solid rgba(255,255,255,0.04)", whiteSpace:"nowrap", ...style }}>
       {children}
     </td>
   );
@@ -45,7 +45,7 @@ export const SortableTh = ({ col, sortCol, sortDir, onSort, children, style = {}
       style={{
         textAlign:"left", padding:"10px 12px", fontWeight:600, fontSize:11,
         textTransform:"uppercase", letterSpacing:"0.06em",
-        borderBottom:`1px solid ${COLORS.border}`, whiteSpace:"nowrap",
+        borderBottom:"1px solid rgba(255,255,255,0.06)", whiteSpace:"nowrap",
         cursor:"pointer", userSelect:"none",
         color: isActive ? COLORS.accent : COLORS.textMuted,
         transition:"color 0.15s", outline:"none",

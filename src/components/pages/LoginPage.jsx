@@ -21,8 +21,8 @@ const LoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <div style={{ width: 420, padding: 40, background: COLORS.card, borderRadius: 24, border: `1px solid ${COLORS.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)" }}>
+    <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse 80% 60% at 15% 20%, rgba(16,185,129,0.07) 0%, transparent 60%), radial-gradient(ellipse 60% 80% at 85% 75%, rgba(59,130,246,0.06) 0%, transparent 55%), radial-gradient(ellipse 50% 50% at 50% 50%, rgba(139,92,246,0.04) 0%, transparent 50%), linear-gradient(180deg, #080B14 0%, #0A0E1A 50%, #080B14 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <div style={{ width: 420, padding: 40, background: "rgba(255,255,255,0.04)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", borderRadius: 24, border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 32 }}>
           <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg, #10B981, #059669)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /></svg>
@@ -38,22 +38,22 @@ const LoginPage = ({ onLogin }) => {
           <div style={{ marginBottom: 16 }}>
             <label htmlFor="login-user" style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 6 }}>Nom d'utilisateur</label>
             <input id="login-user" value={username} onChange={e => setUsername(e.target.value)} placeholder="admin ou entrepot" autoComplete="username"
-              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit", transition: "border-color 0.2s, box-shadow 0.2s" }}
               onFocus={e => e.target.style.borderColor = "#10B981"} onBlur={e => e.target.style.borderColor = COLORS.border} />
           </div>
           <div style={{ marginBottom: 20 }}>
             <label htmlFor="login-pw" style={{ fontSize: 12, fontWeight: 500, color: COLORS.textMuted, display: "block", marginBottom: 6 }}>Mot de passe</label>
             <input id="login-pw" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password"
-              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", color: COLORS.text, fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "inherit", transition: "border-color 0.2s, box-shadow 0.2s" }}
               onFocus={e => e.target.style.borderColor = "#10B981"} onBlur={e => e.target.style.borderColor = COLORS.border} />
           </div>
           {error && <div role="alert" style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#EF4444", fontSize: 12, fontWeight: 500, marginBottom: 16 }}>{error}</div>}
           <button type="submit" disabled={loading || !username || !password}
-            style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #10B981, #059669)", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: (loading || !username || !password) ? 0.6 : 1, fontFamily: "inherit" }}>
+            style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #10B981, #059669)", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: (loading || !username || !password) ? 0.6 : 1, fontFamily: "inherit", boxShadow: "0 0 20px rgba(16,185,129,0.3)", transition: "box-shadow 0.2s" }}>
             {loading ? "Connexion..." : "Se connecter"}
           </button>
         </form>
-        <div style={{ marginTop: 24, padding: 16, background: COLORS.surface, borderRadius: 10, border: `1px solid ${COLORS.border}` }}>
+        <div style={{ marginTop: 24, padding: 16, background: "rgba(255,255,255,0.03)", borderRadius: 10, border: `1px solid ${COLORS.border}` }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Comptes démo</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {[["Admin complet", "admin / admin123"], ["Chef entrepôt", "entrepot / entrepot123"], ["Préposée entrepôt", "sophie / sophie123"]].map(([label, cred]) => (

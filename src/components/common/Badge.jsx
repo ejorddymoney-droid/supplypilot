@@ -32,7 +32,7 @@ const Badge = ({ children, variant = "default" }) => {
   return (
     <span
       role="status"
-      style={{ ...s, padding:"3px 10px", borderRadius:6, fontSize:11, fontWeight:600, letterSpacing:"0.02em", whiteSpace:"nowrap", display:"inline-block" }}
+      style={{ ...s, padding:"3px 10px", borderRadius:6, fontSize:11, fontWeight:600, letterSpacing:"0.02em", whiteSpace:"nowrap", display:"inline-block", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)", ...(children === "CRITICAL" ? { animation:"glowPulse 2s infinite" } : {}) }}
     >
       {children}
     </span>
