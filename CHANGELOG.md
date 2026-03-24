@@ -4,6 +4,136 @@
 
 ---
 
+## v2.9.1 — Refactoring architectural : monolithe → architecture modulaire
+**Date** : 2026-03-24
+**Fichiers** : 48 fichiers dans `src/` (remplace le monolithe `App.jsx` de 4 348 lignes)
+**Version précédente** : v2.1.0
+**Résumé** : Décomposition complète du fichier monolithique `App.jsx` en une architecture modulaire avec séparation des responsabilités, accessibilité WCAG améliorée, et conventions de code standardisées. Aucune modification fonctionnelle — refactoring pur.
+
+### Architecture nouvelle
+
+```
+src/
+├── App.jsx                          # Orchestrateur (~220 lignes)
+├── styles/
+│   ├── tokens.js                    # Design tokens (spacing, radius, fontSize, shadows)
+│   └── themes.js                    # Palettes dark/light
+├── utils/
+│   ├── formatters.js                # Date (fr-CA), fmt, fmtM, parseDecimal
+│   └── csv.js                       # Export CSV (UTF-8 BOM)
+├── hooks/
+│   └── useSortable.js               # Hook tri + ORDINAL_MAPS
+├── contexts/
+│   ├── ThemeContext.jsx              # Contexte thème dark/light
+│   ├── AuthContext.jsx               # Contexte authentification
+│   └── DataContext.jsx               # Contexte données partagées
+├── data/
+│   ├── constants.js                  # Données statiques (fournisseurs, POs, tâches, etc.)
+│   └── generators.js                 # generateItems() + ITEMS (400 articles)
+└── components/
+    ├── common/ (10 composants)       # Icon, Badge, KpiCard, Card, Table, etc.
+    ├── layout/ (2 composants)        # Sidebar, Header
+    ├── overlays/ (7 composants)      # GlobalSearch, SlideOver, modals, Toast
+    └── pages/ (14 composants)        # Toutes les pages
+```
+
+### Fichiers créés — Foundation
+
+| Fichier | Rôle |
+|---------|------|
+| `src/styles/tokens.js` | Tokens de design : spacing (4dp/8dp), radius, fontSize, fontWeight, lineHeight, shadow, transition, zIndex |
+| `src/styles/themes.js` | Objets dark/light extraits du monolithe |
+| `src/utils/formatters.js` | TODAY, TODAY_DISPLAY, QUARTER, formatDate, daysAgo, daysFromNow, parseDecimal, fmt, fmtM |
+| `src/utils/csv.js` | exportCSV() — UTF-8 BOM pour Excel |
+| `src/hooks/useSortable.js` | Hook réutilisable + 8 mappings ordinaux métier |
+| `src/contexts/ThemeContext.jsx` | createContext + useTheme() |
+| `src/contexts/AuthContext.jsx` | createContext + useAuth() |
+| `src/contexts/DataContext.jsx` | createContext + useData() |
+| `src/data/constants.js` | SUPPLIERS, INITIAL_POS (20), INITIAL_TASKS (12), INITIAL_EVENTS (18), INITIAL_COUNTS (12), USERS (4), WAREHOUSE_DAILY_TASKS (9), PO_TRANSITIONS, CYCLE_FREQ, ECART_SEUILS, CAUSE/ZONE/ACTION_OPTIONS, KPIS, ABC_DATA, COVERAGE_DIST, FAMILLES, MONTHLY_PRECISION, ASSIGNEES |
+| `src/data/generators.js` | generateItems() avec seed pseudo-aléatoire + classification ABC Pareto |
+
+### Fichiers créés — Composants communs (avec accessibilité)
+
+| Composant | Améliorations a11y |
+|-----------|-------------------|
+| `Icon.jsx` | `aria-hidden="true"` sur icônes décoratives, `role="img"` + `aria-label` sur icônes significatives. Emojis remplacés par SVG |
+| `Badge.jsx` | `role="status"` pour lecteurs d'écran |
+| `KpiCard.jsx` | `<button>` au lieu de `<div>` cliquable, `aria-label` contextuel, `fontVariantNumeric:"tabular-nums"` |
+| `Card.jsx` | `<section>` sémantique avec `aria-label`, `<h2>` pour titres, `<button>` pour titres cliquables |
+| `Table.jsx` | `role="region"` + `aria-label` + `tabIndex` sur conteneur, `scope="col"` sur `<th>`, `aria-sort` sur colonnes triables, `onKeyDown` clavier |
+| `SearchInput.jsx` | `<label>` masqué avec `htmlFor`, `type="search"` |
+| `FilterPills.jsx` | `aria-pressed` sur toggles, `role="group"` avec `aria-label` |
+| `ExportButton.jsx` | `aria-label` décrivant l'action d'export |
+| `ActionBtn.jsx` | `aria-busy` pendant chargement, unicode au lieu d'emoji |
+| `CustomTooltip.jsx` | `role="tooltip"` |
+
+### Fichiers créés — Layout
+
+| Composant | Contenu |
+|-----------|---------|
+| `Sidebar.jsx` | Navigation avec NAV_ITEMS (14 items, filtrage par rôle), ThemeToggle, avatar utilisateur, logout. `<aside>` + `<nav role="navigation">` + `aria-current="page"` |
+| `Header.jsx` | Titre page, date (fr-CA), recherche ⌘K, cloche notifications avec dropdown, bouton "+ Nouveau PO". `<header>` sémantique |
+
+### Fichiers créés — Overlays
+
+| Composant | Contenu |
+|-----------|---------|
+| `GlobalSearch.jsx` | Recherche multi-entités (articles, POs, fournisseurs). `role="dialog"` + `aria-modal` |
+| `SlideOver.jsx` | Panneau détail 440px (5 types : item, po, task, event, supplier). Timeline PO, commentaires, réassignation |
+| `ConfirmDialog.jsx` | Confirmation transitions PO (réception, clôture). `role="dialog"` |
+| `Toast.jsx` | Notification succès/erreur. `role="status"` + `aria-live="polite"` |
+| `ImportModal.jsx` | Import CSV avec parsing, aperçu, validation |
+| `DocumentAttachModal.jsx` | Joindre documents aux POs |
+| `KPIExpandOverlay.jsx` | 4 vues drill-down (ABC, couverture, familles, PO statut) |
+
+### Fichiers créés — Pages (14)
+
+| Page | Lignes | Fonctionnalités |
+|------|--------|-----------------|
+| `DashboardPage.jsx` | ~190 | 7 KPIs, 4 graphiques Recharts, 2 tableaux, performance fournisseurs |
+| `InventoryPage.jsx` | ~162 | 400 articles paginés (20/page), filtres ABC/famille, import CSV, création PO |
+| `CriticalPage.jsx` | ~55 | Articles priorité haute + sous seuil, création PO directe |
+| `SuppliersPage.jsx` | ~130 | Score composite, ajout fournisseur, barres conformité |
+| `PurchaseOrdersPage.jsx` | ~100 | Workflow PO (5 statuts), import CSV, documents joints |
+| `TasksPage.jsx` | ~70 | Filtrage statut, indicateur échéance, commentaires |
+| `AuditPage.jsx` | ~80 | Journal événements + historique transitions PO |
+| `SettingsPage.jsx` | ~254 | 5 onglets (règles, formules, KPIs, profils, mot de passe) |
+| `TRSPage.jsx` | ~200 | Jauges SVG, inputs interactifs, tendance 6 mois |
+| `CycleCountPage.jsx` | ~255 | 4 onglets (plan, saisie, historique, analyse), questionnaire écart |
+| `LoginPage.jsx` | ~72 | Formulaire connexion, comptes démo |
+| `WarehouseDashboard.jsx` | ~68 | Tâches quotidiennes, activité récente |
+| `WarehouseOrdersPage.jsx` | ~110 | Réception PO avec modal |
+| `WarehouseStatsPage.jsx` | ~75 | Statistiques par type, PieChart répartition |
+
+### Orchestrateur App.jsx (~220 lignes)
+
+Contient uniquement :
+- État global (pos, tasks, events, counts, notifications, activityLog, etc.)
+- Logique métier (transitionPO, createPO avec garde-fous, addEvent, addNotification)
+- Providers (ThemeContext, AuthContext, DataContext)
+- Routing (PAGES mapping → PageComponent)
+- Raccourcis clavier (⌘K, ESC)
+- CSS global (font, scrollbars, animations)
+
+### Point d'entrée modifié
+
+`main.jsx` : `import App from './App.jsx'` → `import App from './src/App.jsx'`
+
+### Fichier supprimé
+
+`App.jsx` (racine, 4 348 lignes) — remplacé par `src/App.jsx` + 47 modules
+
+### Ce qui n'a PAS changé
+
+- Toute la logique métier est identique
+- Tous les styles inline sont préservés
+- Toutes les structures de données sont inchangées
+- Les 8 garde-fous du moteur de règles fonctionnent identiquement
+- Le workflow PO (5 transitions) est intact
+- L'authentification par rôle (admin/entrepôt) est préservée
+
+---
+
 ## v2.1.0 — Module Inventaire Tournant (Cycle Count)
 **Date** : 2026-03-17  
 **Fichier** : `dashboard.jsx` (2 731 lignes, +524 lignes)  
@@ -412,5 +542,6 @@ DashboardPage, CriticalPage, PurchaseOrdersPage, TasksPage, AuditPage — tous m
 | v1.9.0 | Page Performance TRS | ~1 809 | 1 |
 | v2.0.0 | KPI Expand Overlay | ~2 207 | 1 |
 | v2.1.0 | Module Inventaire Tournant | ~2 731 | 1 |
+| v2.9.1 | Refactoring modulaire + a11y | ~2 800 | 48 |
 
-**Version courante : v2.1.0**
+**Version courante : v2.9.1**
