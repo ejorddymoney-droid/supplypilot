@@ -1,7 +1,17 @@
 import { useState, useMemo, createContext, useContext, useCallback, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend, ComposedChart } from "recharts";
 
-const APP_VERSION = "v2.5.0";
+const APP_VERSION = "v2.9.0";
+
+// ─── DATE UTILITIES ──────────────────────────────────────────────────────────
+const NOW = new Date();
+const TODAY = `${NOW.getFullYear()}-${String(NOW.getMonth()+1).padStart(2,'0')}-${String(NOW.getDate()).padStart(2,'0')}`;
+const TODAY_DISPLAY = NOW.toLocaleDateString('fr-CA', { day:'numeric', month:'long', year:'numeric' });
+const QUARTER = `Q${Math.ceil((NOW.getMonth()+1)/3)} ${NOW.getFullYear()}`;
+const formatDate = (d) => { if (!d) return "—"; const dt = typeof d === "string" ? new Date(d) : d; return isNaN(dt) ? d : dt.toLocaleDateString('fr-CA'); };
+const daysAgo = (n) => { const d = new Date(NOW); d.setDate(d.getDate()-n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const daysFromNow = (n) => { const d = new Date(NOW); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const parseDecimal = (v) => { if (typeof v === 'number') return v; return parseFloat(String(v).replace(',','.')) || 0; };
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const SUPPLIERS = [
@@ -126,9 +136,9 @@ const INITIAL_POS = [
 const INITIAL_TASKS = [
   { task_id:1, type:"Validation PO", related_po_id:2, assigned_to:"Marie Lavoie", status:"Ouverte", due_at:"2026-03-16", comment:"PO haute valeur — validation requise" },
   { task_id:2, type:"Approbation managériale", related_po_id:4, assigned_to:"Jean Dupont", status:"Ouverte", due_at:"2026-03-15", comment:"Qty > 2x EOQ" },
-  { task_id:3, type:"Relance fournisseur", related_po_id:1, assigned_to:"Pierre Tremblay", status:"En cours", due_at:"2026-03-18", comment:"Délai dépassé de 3 jours" },
+  { task_id:3, type:"Relance fournisseur", related_po_id:1, assigned_to:"Pierre Tremblay", status:"En cours", due_at:TODAY, comment:"Délai dépassé de 3 jours" },
   { task_id:4, type:"Vérification stock", related_po_id:5, assigned_to:"Sophie Gagnon", status:"Terminée", due_at:"2026-03-10", comment:"Stock confirmé après réception" },
-  { task_id:5, type:"Validation PO", related_po_id:7, assigned_to:"Marie Lavoie", status:"Ouverte", due_at:"2026-03-17", comment:"Nouveau fournisseur — vérification" },
+  { task_id:5, type:"Validation PO", related_po_id:7, assigned_to:"Marie Lavoie", status:"Ouverte", due_at:daysFromNow(3), comment:"Nouveau fournisseur — vérification" },
   { task_id:6, type:"Approbation managériale", related_po_id:13, assigned_to:"Jean Dupont", status:"Ouverte", due_at:"2026-03-19", comment:"Article critique classe A" },
   { task_id:7, type:"Relance fournisseur", related_po_id:10, assigned_to:"Pierre Tremblay", status:"En cours", due_at:"2026-03-20", comment:"Accusé réception non reçu" },
   { task_id:8, type:"Vérification stock", related_po_id:8, assigned_to:"Sophie Gagnon", status:"Terminée", due_at:"2026-03-08", comment:"Écart quantité réception" },
@@ -399,9 +409,9 @@ const TableContainer = ({ children }) => (
   </div>
 );
 
-const Th = ({ children, style={} }) => {
+const Th = ({ children, style={}, tip }) => {
   const COLORS = useTheme();
-  return <th style={{ textAlign:"left", padding:"10px 12px", color:COLORS.textMuted, fontWeight:600, fontSize:11, textTransform:"uppercase", letterSpacing:"0.06em", borderBottom:`1px solid ${COLORS.border}`, whiteSpace:"nowrap", ...style }}>{children}</th>;
+  return <th title={tip} style={{ textAlign:"left", padding:"10px 12px", color:COLORS.textMuted, fontWeight:600, fontSize:11, textTransform:"uppercase", letterSpacing:"0.06em", borderBottom:`1px solid ${COLORS.border}`, whiteSpace:"nowrap", cursor:tip?"help":"default", ...style }}>{children}</th>;
 };
 
 const Td = ({ children, style={} }) => {
@@ -451,11 +461,11 @@ const useSortable = (defaultCol=null, defaultDir="desc") => {
   return { sortCol, sortDir, handleSort, sortData };
 };
 
-const SortableTh = ({ col, sortCol, sortDir, onSort, children, style={} }) => {
+const SortableTh = ({ col, sortCol, sortDir, onSort, children, style={}, tip }) => {
   const COLORS = useTheme();
   const isActive = sortCol === col;
   return (
-    <th onClick={() => onSort(col)}
+    <th onClick={() => onSort(col)} title={tip}
       style={{
         textAlign:"left", padding:"10px 12px", fontWeight:600, fontSize:11,
         textTransform:"uppercase", letterSpacing:"0.06em",
@@ -597,65 +607,182 @@ const GlobalSearch = ({ onNavigate, onClose }) => {
 // ─── SLIDE-OVER DETAIL ───────────────────────────────────────────────────────
 const SlideOver = ({ data, type, onClose }) => {
   const COLORS = useTheme();
+  const { setTasks, tasks, events, setEvents, pos, showToast, addEvent } = useData();
+  const auth = useAuth();
+  const [newComment, setNewComment] = useState("");
+  const [newNote, setNewNote] = useState("");
   if (!data) return null;
+
+  const ASSIGNEES = ["Jean Dupont","Marie Lavoie","Pierre Tremblay","Sophie Gagnon","Marc Bélanger","Luc Martineau"];
 
   const Row = ({ label, value, color }) => (
     <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${COLORS.border}22` }}>
       <span style={{ fontSize:12, color:COLORS.textMuted }}>{label}</span>
-      <span style={{ fontSize:13, fontWeight:500, color:color||COLORS.text }}>{value}</span>
+      <span style={{ fontSize:13, fontWeight:500, color:color||COLORS.text, textAlign:"right", maxWidth:220 }}>{value}</span>
     </div>
   );
+
+  const handleAssign = (taskId, assignee) => {
+    setTasks(prev => prev.map(t => t.task_id === taskId ? { ...t, assigned_to: assignee } : t));
+    addEvent("TASK_REASSIGNED", "Task", taskId, `Tâche #${taskId} réassignée à ${assignee}`, "INFO");
+    showToast(`Tâche réassignée à ${assignee}`);
+  };
+
+  const handleAddComment = (taskId) => {
+    if (!newComment.trim()) return;
+    setTasks(prev => prev.map(t => {
+      if (t.task_id !== taskId) return t;
+      const comments = t.comments || [];
+      return { ...t, comments: [...comments, { text: newComment, by: auth?.user?.nom || "Admin", date: TODAY }] };
+    }));
+    setNewComment("");
+    showToast("Commentaire ajouté");
+  };
+
+  const handleAddNote = (eventId) => {
+    if (!newNote.trim()) return;
+    setEvents(prev => prev.map(e => {
+      if (e.event_id !== eventId) return e;
+      const notes = e.notes || [];
+      return { ...e, notes: [...notes, { text: newNote, by: auth?.user?.nom || "Admin", date: TODAY }] };
+    }));
+    setNewNote("");
+    showToast("Note ajoutée");
+  };
+
+  const handleStatusChange = (taskId, newStatus) => {
+    setTasks(prev => prev.map(t => t.task_id === taskId ? { ...t, status: newStatus, ...(newStatus === "Terminée" ? { completed_at: TODAY } : {}) } : t));
+    showToast(`Statut → ${newStatus}`);
+  };
+
+  const title = type === "item" ? "Détail article" : type === "po" ? "Détail PO" : type === "task" ? "Détail tâche" : type === "event" ? "Détail événement" : "Détail fournisseur";
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:1002, display:"flex" }} onClick={onClose}>
       <div style={{ flex:1 }}/>
       <div onClick={e=>e.stopPropagation()} style={{
-        width:420, background:COLORS.card, borderLeft:`1px solid ${COLORS.border}`, height:"100%",
+        width:440, background:COLORS.card, borderLeft:`1px solid ${COLORS.border}`, height:"100%",
         boxShadow:"-10px 0 40px rgba(0,0,0,0.3)", overflowY:"auto", animation:"slideRight 0.25s ease",
       }}>
         <div style={{ padding:"20px 24px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, background:COLORS.card, zIndex:1 }}>
-          <div style={{ fontSize:16, fontWeight:700, color:COLORS.text }}>{type === "item" ? "Détail article" : type === "po" ? "Détail PO" : "Détail fournisseur"}</div>
+          <div style={{ fontSize:16, fontWeight:700, color:COLORS.text }}>{title}</div>
           <button onClick={onClose} style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}`, borderRadius:8, color:COLORS.textMuted, cursor:"pointer", padding:"4px 10px", fontSize:12 }}>✕</button>
         </div>
         <div style={{ padding:"16px 24px" }}>
           {type === "item" && <>
             <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:4 }}>{data.article}</div>
             <div style={{ display:"flex", gap:6, marginBottom:16 }}><Badge>{data.abc}</Badge><Badge>{data.statut_service}</Badge><Badge>{data.priorite}</Badge></div>
-            <Row label="SKU" value={data.sku}/>
-            <Row label="Famille" value={data.famille}/>
-            <Row label="Demande annuelle" value={fmt(data.demande)}/>
-            <Row label="Coût unitaire" value={`$${data.cout_unitaire?.toFixed(2)}`}/>
-            <Row label="EOQ" value={fmt(data.eoq)} color={COLORS.accent}/>
-            <Row label="ROP" value={fmt(data.rop)}/>
-            <Row label="Stock net" value={fmt(data.stock_net)} color={data.stock_net<data.seuil_min?COLORS.danger:COLORS.accent}/>
-            <Row label="Seuil minimum" value={fmt(data.seuil_min)}/>
-            <Row label="Couverture" value={`${data.couverture?.toFixed(1)} jours`} color={data.couverture<15?COLORS.danger:data.couverture<30?COLORS.warning:COLORS.accent}/>
-            <Row label="Lead time" value={`${data.lead_time} jours`}/>
-            <Row label="Fournisseur" value={SUPPLIER_MAP[data.supplier_id] || "—"}/>
+            <Row label="SKU" value={data.sku}/><Row label="Famille" value={data.famille}/><Row label="Demande annuelle" value={fmt(data.demande)}/>
+            <Row label="Coût unitaire" value={`$${data.cout_unitaire?.toFixed(2)}`}/><Row label="EOQ" value={fmt(data.eoq)} color={COLORS.accent}/>
+            <Row label="ROP" value={fmt(data.rop)}/><Row label="Stock net" value={fmt(data.stock_net)} color={data.stock_net<data.seuil_min?COLORS.danger:COLORS.accent}/>
+            <Row label="Seuil minimum" value={fmt(data.seuil_min)}/><Row label="Couverture" value={`${data.couverture?.toFixed(1)} jours`} color={data.couverture<15?COLORS.danger:data.couverture<30?COLORS.warning:COLORS.accent}/>
+            <Row label="Lead time" value={`${data.lead_time} jours`}/><Row label="Fournisseur" value={SUPPLIER_MAP[data.supplier_id] || "—"}/>
           </>}
           {type === "po" && <>
             <div style={{ fontSize:18, fontWeight:700, color:COLORS.accent, marginBottom:4 }}>{data.po_number}</div>
-            <div style={{ display:"flex", gap:6, marginBottom:16 }}><Badge>{data.statut}</Badge></div>
-            <Row label="Article" value={data.article}/>
-            <Row label="SKU" value={data.sku}/>
-            <Row label="Fournisseur" value={SUPPLIER_MAP[data.supplier_id] || "—"}/>
-            <Row label="Quantité" value={data.qty}/>
-            <Row label="Prix négocié" value={`$${data.prix_negocie?.toFixed(2)}`}/>
-            <Row label="Prix payé" value={data.prix_paye ? `$${data.prix_paye.toFixed(2)}` : "—"}/>
-            <Row label="Date création" value={data.date_creation}/>
-            <Row label="Date validation" value={data.date_validation || "—"}/>
-            <Row label="Date envoi" value={data.date_envoi || "—"}/>
-            <Row label="Date réception" value={data.date_reception || "—"}/>
-            <Row label="Créé par" value={data.created_by}/>
+            <div style={{ display:"flex", gap:6, marginBottom:16 }}><Badge>{data.statut}</Badge>{data.documents?.length > 0 && <span style={{ fontSize:10, color:COLORS.textDim }}>📎 {data.documents.length}</span>}</div>
+            <Row label="Article" value={data.article}/><Row label="SKU" value={data.sku}/><Row label="Fournisseur" value={SUPPLIER_MAP[data.supplier_id] || "—"}/>
+            <Row label="Quantité" value={data.qty_recue ? `${data.qty_recue} reçu / ${data.qty} cmd` : data.qty}/>
+            <Row label="Prix négocié" value={`$${data.prix_negocie?.toFixed(2)}`}/><Row label="Prix payé" value={data.prix_paye ? `$${data.prix_paye.toFixed(2)}` : "—"}/>
+            <Row label="Créé par" value={data.created_by}/>{data.received_by && <Row label="Réceptionné par" value={data.received_by}/>}
+            {data.reception_probleme && data.reception_probleme !== "Aucun — conforme" && <Row label="Problème" value={data.reception_probleme} color={COLORS.danger}/>}
+            <div style={{ marginTop:20, marginBottom:8, fontSize:12, fontWeight:600, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:"0.04em" }}>Timeline du PO</div>
+            <div style={{ position:"relative", paddingLeft:20 }}>
+              <div style={{ position:"absolute", left:7, top:8, bottom:8, width:2, background:COLORS.border }}/>
+              {[{label:"Création",date:data.date_creation,color:"#6b7280"},{label:"Validation",date:data.date_validation,color:"#f59e0b"},{label:"Envoi",date:data.date_envoi,color:"#3b82f6"},{label:"Réception",date:data.date_reception,color:"#10b981"},{label:"Clôture",date:data.statut==="CLOS"?data.date_reception:null,color:"#8b5cf6"}].map((step,i)=>{
+                const done=step.date!=null; return (
+                <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:14, marginBottom:14, position:"relative" }}>
+                  <div style={{ width:16, height:16, borderRadius:8, border:`2px solid ${done?step.color:COLORS.border}`, background:done?step.color:"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, zIndex:1 }}>
+                    {done && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </div>
+                  <div><div style={{ fontSize:12, fontWeight:done?600:400, color:done?COLORS.text:COLORS.textDim }}>{step.label}</div>
+                  <div style={{ fontSize:11, color:done?step.color:COLORS.textDim }}>{done?formatDate(step.date):"En attente"}</div></div>
+                </div>);
+              })}
+            </div>
           </>}
+          {type === "task" && (() => {
+            const t = tasks.find(tk => tk.task_id === data.task_id) || data;
+            const po = pos.find(p => p.po_id === t.related_po_id);
+            const comments = t.comments || [];
+            return <>
+              <div style={{ fontSize:16, fontWeight:700, color:COLORS.text, marginBottom:4 }}>{t.type}</div>
+              <div style={{ display:"flex", gap:6, marginBottom:16 }}><Badge>{t.status}</Badge></div>
+              {po && <Row label="PO lié" value={po.po_number}/>}
+              <Row label="Échéance" value={formatDate(t.due_at)} color={new Date(t.due_at)<new Date(TODAY)&&t.status!=="Terminée"?COLORS.danger:COLORS.text}/>
+              {/* Status change */}
+              <div style={{ marginTop:16, marginBottom:8, fontSize:12, fontWeight:600, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:"0.04em" }}>Changer le statut</div>
+              <div style={{ display:"flex", gap:6, marginBottom:16 }}>
+                {["Ouverte","En cours","Terminée"].map(s => (
+                  <button key={s} onClick={()=>handleStatusChange(t.task_id, s)}
+                    style={{ flex:1, padding:"8px", borderRadius:8, border:`1px solid ${t.status===s?COLORS.accent:COLORS.border}`,
+                      background:t.status===s?COLORS.accentGlow:"transparent", color:t.status===s?COLORS.accent:COLORS.textMuted,
+                      fontSize:11, fontWeight:t.status===s?600:400, cursor:"pointer" }}>{s}</button>
+                ))}
+              </div>
+              {/* Assignee */}
+              <div style={{ marginBottom:8, fontSize:12, fontWeight:600, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:"0.04em" }}>Assigné à</div>
+              <select value={t.assigned_to} onChange={e=>handleAssign(t.task_id, e.target.value)}
+                style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:13, outline:"none", marginBottom:16, fontFamily:"inherit", cursor:"pointer" }}>
+                {ASSIGNEES.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              {/* Comments */}
+              <div style={{ marginBottom:8, fontSize:12, fontWeight:600, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:"0.04em" }}>Commentaires ({comments.length})</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12, maxHeight:220, overflowY:"auto" }}>
+                {t.comment && <div style={{ padding:"10px 12px", borderRadius:8, background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+                  <div style={{ fontSize:12, color:COLORS.text }}>{t.comment}</div>
+                  <div style={{ fontSize:10, color:COLORS.textDim, marginTop:4 }}>Note initiale</div>
+                </div>}
+                {comments.map((c, i) => (
+                  <div key={i} style={{ padding:"10px 12px", borderRadius:8, background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+                    <div style={{ fontSize:12, color:COLORS.text }}>{c.text}</div>
+                    <div style={{ fontSize:10, color:COLORS.textDim, marginTop:4 }}>{c.by} — {formatDate(c.date)}</div>
+                  </div>
+                ))}
+                {comments.length === 0 && !t.comment && <div style={{ fontSize:12, color:COLORS.textDim, padding:8 }}>Aucun commentaire</div>}
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <textarea value={newComment} onChange={e=>setNewComment(e.target.value)} rows={2} placeholder="Ajouter un commentaire..."
+                  style={{ flex:1, padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:12, outline:"none", resize:"vertical", fontFamily:"inherit" }}/>
+                <button onClick={()=>handleAddComment(t.task_id)} disabled={!newComment.trim()}
+                  style={{ padding:"8px 14px", borderRadius:8, border:"none", background:COLORS.accent, color:"white", fontSize:11, fontWeight:600, cursor:"pointer", alignSelf:"flex-end", opacity:newComment.trim()?1:0.4 }}>Envoyer</button>
+              </div>
+            </>;
+          })()}
+          {type === "event" && (() => {
+            const ev = events.find(e => e.event_id === data.event_id) || data;
+            const notes = ev.notes || [];
+            return <>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}><Badge>{ev.level}</Badge><span style={{ fontSize:14, fontWeight:600, color:COLORS.text }}>{ev.type_event}</span></div>
+              <Row label="Date" value={ev.date}/><Row label="Utilisateur" value={ev.utilisateur}/><Row label="Entité" value={ev.entite}/><Row label="ID" value={`#${ev.entite_id}`}/>
+              <div style={{ marginTop:12, padding:"12px 14px", borderRadius:10, background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+                <div style={{ fontSize:11, fontWeight:600, color:COLORS.textMuted, marginBottom:6 }}>DÉTAILS</div>
+                <div style={{ fontSize:13, color:COLORS.text, lineHeight:1.5 }}>{ev.details}</div>
+              </div>
+              <div style={{ marginTop:20, marginBottom:8, fontSize:12, fontWeight:600, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:"0.04em" }}>Notes ({notes.length})</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12, maxHeight:220, overflowY:"auto" }}>
+                {notes.length === 0 && <div style={{ fontSize:12, color:COLORS.textDim, padding:8 }}>Aucune note ajoutée</div>}
+                {notes.map((n, i) => (
+                  <div key={i} style={{ padding:"10px 12px", borderRadius:8, background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+                    <div style={{ fontSize:12, color:COLORS.text }}>{n.text}</div>
+                    <div style={{ fontSize:10, color:COLORS.textDim, marginTop:4 }}>{n.by} — {formatDate(n.date)}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <textarea value={newNote} onChange={e=>setNewNote(e.target.value)} rows={2} placeholder="Ajouter une note..."
+                  style={{ flex:1, padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:12, outline:"none", resize:"vertical", fontFamily:"inherit" }}/>
+                <button onClick={()=>handleAddNote(ev.event_id)} disabled={!newNote.trim()}
+                  style={{ padding:"8px 14px", borderRadius:8, border:"none", background:COLORS.accent, color:"white", fontSize:11, fontWeight:600, cursor:"pointer", alignSelf:"flex-end", opacity:newNote.trim()?1:0.4 }}>Envoyer</button>
+              </div>
+            </>;
+          })()}
           {type === "supplier" && <>
             <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:4 }}>{data.nom}</div>
             <div style={{ display:"flex", gap:6, marginBottom:16 }}><Badge>{data.statut}</Badge></div>
-            <Row label="Pays" value={data.pays}/>
-            <Row label="Délai moyen" value={`${data.delai_moyen} jours`}/>
+            <Row label="Pays" value={data.pays}/><Row label="Délai moyen" value={`${data.delai_moyen} jours`}/>
             <Row label="Conformité" value={`${data.taux_conformite}%`} color={data.taux_conformite>90?COLORS.accent:COLORS.warning}/>
-            <Row label="Taux retard" value={`${data.taux_retard}%`} color={data.taux_retard>15?COLORS.danger:COLORS.text}/>
-            <Row label="Email" value={data.email}/>
+            <Row label="Taux retard" value={`${data.taux_retard}%`} color={data.taux_retard>10?COLORS.danger:COLORS.text}/><Row label="Email" value={data.email}/>
           </>}
         </div>
       </div>
@@ -864,13 +991,62 @@ const DashboardPage = () => {
 // INVENTORY
 const InventoryPage = () => {
   const COLORS = useTheme();
-  const { setSlideOver } = useData();
+  const { setSlideOver, addEvent, showToast, pos, createPO } = useData();
+  const auth = useAuth();
   const [search, setSearch] = useState("");
   const [abcFilter, setAbcFilter] = useState(null);
   const [familleFilter, setFamilleFilter] = useState(null);
   const { sortCol, sortDir, handleSort, sortData } = useSortable("valeur_annuelle","desc");
   const [page, setPage] = useState(0);
+  const [showImport, setShowImport] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const pageSize = 20;
+
+  const handleImportItems = (rows) => {
+    let added = 0, updated = 0;
+    rows.forEach(row => {
+      const sku = row.sku || row.SKU;
+      if (!sku) return;
+      const existing = ITEMS.find(i => i.sku === sku);
+      if (existing) {
+        if (row.nom) existing.article = row.nom;
+        if (row.famille) existing.famille = row.famille;
+        if (row.stock_net) existing.stock_net = parseInt(row.stock_net) || existing.stock_net;
+        if (row.demande_annuelle) existing.demande = parseInt(row.demande_annuelle) || existing.demande;
+        if (row.cout_unitaire) existing.cout_unitaire = parseFloat(row.cout_unitaire) || existing.cout_unitaire;
+        if (row.seuil_min) existing.seuil_min = parseInt(row.seuil_min) || existing.seuil_min;
+        updated++;
+      } else {
+        const id = ITEMS.length + 1;
+        const dem = parseInt(row.demande_annuelle) || 1000;
+        const cout = parseFloat(row.cout_unitaire) || 50;
+        const cc = parseFloat(row.cout_commande) || 25;
+        const tp = 0.25;
+        const sn = parseInt(row.stock_net) || 100;
+        const sm = parseInt(row.seuil_min) || 80;
+        const ss = parseInt(row.stock_securite) || 50;
+        const lt = parseInt(row.lead_time_jours) || 10;
+        const h = cout * tp;
+        const eoq = h > 0 ? Math.round(Math.sqrt((2 * dem * cc) / h)) : 100;
+        const rop = Math.round((dem / 365 * lt) + ss);
+        const couv = dem > 0 ? +(sn / (dem / 365)).toFixed(1) : 999;
+        ITEMS.push({
+          id, sku, article: row.nom || sku, famille: row.famille || "Autre",
+          abc: "C", demande: dem, cout_unitaire: cout, cout_commande: cc, taux_possession: tp,
+          stock_net: sn, seuil_min: sm, stock_securite: ss, lead_time: lt,
+          eoq, rop, couverture: couv, supplier_id: 1,
+          valeur_annuelle: dem * cout,
+          statut_service: sn <= 0 ? "Rupture" : sn < sm ? "Sous seuil" : "Conforme",
+          priorite: "Basse",
+        });
+        added++;
+      }
+    });
+    addEvent("IMPORT_ITEMS", "Item", 0, `Import CSV: ${added} ajoutés, ${updated} mis à jour (${rows.length} lignes)`, "INFO");
+    showToast(`Import terminé — ${added} ajoutés, ${updated} mis à jour`);
+    setShowImport(false);
+    setRefreshKey(k => k + 1);
+  };
 
   const filtered = useMemo(() => {
     let data = [...ITEMS];
@@ -884,7 +1060,7 @@ const InventoryPage = () => {
   const totalPages = Math.ceil(filtered.length/pageSize);
   const csvCols = [{key:"sku",label:"SKU"},{key:"article",label:"Article"},{key:"famille",label:"Famille"},{key:"abc",label:"ABC"},{key:"demande",label:"Demande/an"},{key:"cout_unitaire",label:"Coût unit."},{key:"eoq",label:"EOQ"},{key:"rop",label:"ROP"},{key:"stock_net",label:"Stock"},{key:"seuil_min",label:"Seuil"},{key:"couverture",label:"Couverture (j)"},{key:"statut_service",label:"Statut"},{key:"priorite",label:"Priorité"}];
 
-  const S = ({ col, children }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={c=>{handleSort(c);setPage(0);}}>{children}</SortableTh>;
+  const S = ({ col, children, tip }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={c=>{handleSort(c);setPage(0);}} tip={tip}>{children}</SortableTh>;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
@@ -894,19 +1070,32 @@ const InventoryPage = () => {
         <FilterPills options={["Électrique","Mécanique","MRO","Hydraulique","Packaging","Consommables","Quincaillerie","Sécurité"]} selected={familleFilter} onSelect={v=>{setFamilleFilter(v);setPage(0);}}/>
         <span style={{ marginLeft:"auto", fontSize:12, color:COLORS.textMuted }}>{filtered.length} articles</span>
       </div>
-      <Card headerRight={<ExportButton data={filtered} columns={csvCols} filename="inventaire"/>}>
+      <Card headerRight={<div style={{ display:"flex", gap:6 }}>{auth?.user?.role === "admin" && <button onClick={()=>setShowImport(true)} style={{ padding:"4px 12px", borderRadius:6, border:`1px solid ${COLORS.info}`, background:`${COLORS.info}15`, color:COLORS.info, fontSize:11, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>📥 Importer CSV</button>}<ExportButton data={filtered} columns={csvCols} filename="inventaire"/></div>}>
         <TableContainer>
           <thead>
             <tr>
-              <S col="sku">SKU</S><S col="article">Article</S><S col="famille">Famille</S><S col="abc">ABC</S>
-              <S col="demande">Demande/an</S><S col="cout_unitaire">Coût unit.</S>
-              <S col="eoq">EOQ</S><S col="rop">ROP</S>
-              <S col="stock_net">Stock</S><S col="seuil_min">Seuil</S>
-              <S col="couverture">Couv. (j)</S><S col="statut_service">Statut</S><S col="priorite">Priorité</S>
+              <S col="sku" tip="Identifiant unique de l'article">SKU</S>
+              <S col="article" tip="Nom de l'article">Article</S>
+              <S col="famille" tip="Catégorie de l'article">Famille</S>
+              <S col="abc" tip="Classification Pareto — A: 80% valeur, B: 15%, C: 5%">ABC</S>
+              <S col="demande" tip="Quantité consommée par année">Demande/an</S>
+              <S col="cout_unitaire" tip="Prix d'achat unitaire">Coût unit.</S>
+              <S col="eoq" tip="Economic Order Quantity — quantité optimale de commande">EOQ</S>
+              <S col="rop" tip="Reorder Point — seuil de déclenchement de commande">ROP</S>
+              <S col="stock_net" tip="Quantité actuellement en stock">Stock</S>
+              <S col="seuil_min" tip="Stock minimum avant alerte">Seuil</S>
+              <S col="couverture" tip="Nombre de jours de stock restant au rythme actuel">Couv. (j)</S>
+              <S col="statut_service" tip="Conforme, Sous seuil ou Rupture">Statut</S>
+              <Th tip="Statut du bon de commande en cours pour cet article">PO</Th>
             </tr>
           </thead>
           <tbody>
-            {paged.map(it => (
+            {paged.map(it => {
+              const activePO = pos.find(p => p.sku === it.sku && p.statut !== "CLOS");
+              const statusColors = { BROUILLON:"#6b7280", A_VALIDER:"#f59e0b", ENVOYE:"#3b82f6", RECU:"#10b981" };
+              const statusSteps = ["BROUILLON","A_VALIDER","ENVOYE","RECU"];
+              const stepIdx = activePO ? statusSteps.indexOf(activePO.statut) : -1;
+              return (
               <tr key={it.id} style={{ transition:"background 0.15s", cursor:"pointer" }} onClick={()=>setSlideOver({data:it,type:"item"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <Td style={{ fontWeight:600, color:COLORS.accent, fontSize:12 }}>{it.sku}</Td>
                 <Td style={{ fontWeight:500, maxWidth:180, overflow:"hidden", textOverflow:"ellipsis" }}>{it.article}</Td>
@@ -920,9 +1109,23 @@ const InventoryPage = () => {
                 <Td style={{ color:COLORS.textDim }}>{fmt(it.seuil_min)}</Td>
                 <Td style={{ color:it.couverture<15?COLORS.danger:it.couverture<30?COLORS.warning:COLORS.accent }}>{it.couverture.toFixed(0)}j</Td>
                 <Td><Badge>{it.statut_service}</Badge></Td>
-                <Td><Badge>{it.priorite}</Badge></Td>
+                <Td onClick={e=>e.stopPropagation()}>
+                  {activePO ? (
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <div style={{ display:"flex", gap:2 }}>
+                        {statusSteps.map((s, i) => (
+                          <div key={s} style={{ width:14, height:4, borderRadius:2, background:i<=stepIdx ? statusColors[statusSteps[Math.min(i, stepIdx)]] || COLORS.border : COLORS.border, transition:"background 0.2s" }}/>
+                        ))}
+                      </div>
+                      <span style={{ fontSize:9, color:statusColors[activePO.statut], fontWeight:600 }}>{activePO.po_number}</span>
+                    </div>
+                  ) : (
+                    <button onClick={()=>createPO(it)} style={{ padding:"2px 8px", borderRadius:4, border:`1px solid ${COLORS.accent}40`, background:`${COLORS.accent}10`, color:COLORS.accent, fontSize:9, fontWeight:600, cursor:"pointer" }}>+ PO</button>
+                  )}
+                </Td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </TableContainer>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:14, paddingTop:12, borderTop:`1px solid ${COLORS.border}` }}>
@@ -933,6 +1136,7 @@ const InventoryPage = () => {
           </div>
         </div>
       </Card>
+      {showImport && <ImportModal type="items" onClose={()=>setShowImport(false)} onImport={handleImportItems}/>}
     </div>
   );
 };
@@ -943,7 +1147,7 @@ const CriticalPage = () => {
   const { createPO, setSlideOver } = useData();
   const criticals = useMemo(() => ITEMS.filter(i => i.priorite==="Haute" || i.statut_service==="Sous seuil"), []);
   const { sortCol, sortDir, handleSort, sortData } = useSortable("couverture","asc");
-  const S = ({ col, children }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>{children}</SortableTh>;
+  const S = ({ col, children, tip }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} tip={tip}>{children}</SortableTh>;
   const sorted = sortData(criticals).slice(0,30);
   const csvCols = [{key:"sku",label:"SKU"},{key:"article",label:"Article"},{key:"famille",label:"Famille"},{key:"abc",label:"ABC"},{key:"stock_net",label:"Stock net"},{key:"seuil_min",label:"Seuil min"},{key:"eoq",label:"EOQ"},{key:"rop",label:"ROP"},{key:"couverture",label:"Couverture (j)"},{key:"statut_service",label:"Statut"},{key:r=>SUPPLIER_MAP[r.supplier_id]||"",label:"Fournisseur"}];
   return (
@@ -986,12 +1190,42 @@ const CriticalPage = () => {
 // SUPPLIERS
 const SuppliersPage = () => {
   const COLORS = useTheme();
-  const { setSlideOver } = useData();
+  const { setSlideOver, addEvent, showToast } = useData();
   const { sortCol, sortDir, handleSort, sortData } = useSortable("taux_conformite","desc");
-  const S = ({ col, children }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>{children}</SortableTh>;
+  const S = ({ col, children, tip }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} tip={tip}>{children}</SortableTh>;
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ nom:"", statut:"actif", delai_moyen:"", taux_conformite:"", taux_retard:"", pays:"", email:"" });
   const suppliersWithScore = SUPPLIERS.map(s => ({ ...s, score: Math.round(s.taux_conformite*0.6 + (100-s.taux_retard)*0.2 + (30-Math.min(s.delai_moyen,30))/30*100*0.2) }));
   const sorted = sortData(suppliersWithScore);
   const csvCols = [{key:"nom",label:"Nom"},{key:"statut",label:"Statut"},{key:"pays",label:"Pays"},{key:"delai_moyen",label:"Délai moyen"},{key:"taux_conformite",label:"Conformité %"},{key:"taux_retard",label:"Retard %"},{key:"score",label:"Score"},{key:"email",label:"Email"}];
+
+  const handleAddSupplier = () => {
+    if (!form.nom) return;
+    const newId = SUPPLIERS.length + 1;
+    const newSupplier = {
+      id: newId, nom: form.nom, statut: form.statut,
+      delai_moyen: parseDecimal(form.delai_moyen) || 10,
+      taux_conformite: parseDecimal(form.taux_conformite) || 90,
+      taux_retard: parseDecimal(form.taux_retard) || 5,
+      pays: form.pays || "Canada", email: form.email || "",
+    };
+    SUPPLIERS.push(newSupplier);
+    SUPPLIER_MAP[newId] = newSupplier.nom;
+    addEvent("SUPPLIER_CREATED", "Supplier", newId, `Fournisseur créé: ${newSupplier.nom} (${newSupplier.pays})`, "INFO");
+    showToast(`Fournisseur "${newSupplier.nom}" ajouté`);
+    setForm({ nom:"", statut:"actif", delai_moyen:"", taux_conformite:"", taux_retard:"", pays:"", email:"" });
+    setShowAdd(false);
+  };
+
+  const InputField = ({ label, field, type="text", placeholder="" }) => (
+    <div style={{ marginBottom:12 }}>
+      <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:4 }}>{label}</label>
+      <input value={form[field]} onChange={e=>setForm(f=>({...f,[field]:e.target.value}))} type={type} placeholder={placeholder}
+        style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}
+        onFocus={e=>e.target.style.borderColor=COLORS.accent} onBlur={e=>e.target.style.borderColor=COLORS.border}/>
+    </div>
+  );
+
   return (
   <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
     <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:12 }}>
@@ -1000,34 +1234,82 @@ const SuppliersPage = () => {
       <KpiCard label="Conformité moy." value={`${(SUPPLIERS.reduce((s,sup)=>s+sup.taux_conformite,0)/SUPPLIERS.length).toFixed(1)}%`} color={COLORS.accent}/>
       <KpiCard label="À risque" value={SUPPLIERS.filter(s=>s.taux_conformite<80||s.statut==="inactif").length} color={COLORS.danger}/>
     </div>
-    <Card title="Fournisseurs" headerRight={<ExportButton data={sorted} columns={csvCols} filename="fournisseurs"/>}>
+    <Card title="Fournisseurs" headerRight={<div style={{ display:"flex", gap:6 }}>
+      <button onClick={()=>setShowAdd(true)} style={{ padding:"4px 14px", borderRadius:6, border:`1px solid ${COLORS.accent}`, background:COLORS.accentGlow, color:COLORS.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}>+ Ajouter</button>
+      <ExportButton data={sorted} columns={csvCols} filename="fournisseurs"/>
+    </div>}>
       <TableContainer>
-        <thead><tr><S col="nom">Nom</S><S col="statut">Statut</S><S col="pays">Pays</S><S col="delai_moyen">Délai moyen</S><S col="taux_conformite">Conformité</S><S col="taux_retard">Taux retard</S><S col="score">Score</S><Th>Email</Th></tr></thead>
+        <thead><tr>
+          <S col="nom" tip="Raison sociale du fournisseur">Nom</S>
+          <S col="statut" tip="Actif ou inactif — les fournisseurs inactifs bloquent la création de PO">Statut</S>
+          <S col="pays" tip="Pays d'origine du fournisseur">Pays</S>
+          <S col="delai_moyen" tip="Délai moyen de livraison en jours">Délai moyen</S>
+          <S col="taux_conformite" tip="Pourcentage de commandes conformes aux spécifications">Conformité</S>
+          <S col="taux_retard" tip="Pourcentage de commandes livrées en retard">Taux retard</S>
+          <S col="score" tip="Score composite: 60% conformité + 20% ponctualité + 20% rapidité">Score</S>
+          <Th tip="Adresse courriel du contact principal">Email</Th>
+        </tr></thead>
         <tbody>
-          {sorted.map(s => {
-            return (
-              <tr key={s.id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:s,type:"supplier"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <Td style={{ fontWeight:600 }}>{s.nom}</Td>
-                <Td><Badge>{s.statut}</Badge></Td>
-                <Td style={{ color:COLORS.textMuted }}>{s.pays}</Td>
-                <Td>{s.delai_moyen} jours</Td>
-                <Td>
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ background:COLORS.bg, borderRadius:4, height:6, width:80, overflow:"hidden" }}>
-                      <div style={{ width:`${s.taux_conformite}%`, height:"100%", background:s.taux_conformite>90?COLORS.accent:s.taux_conformite>80?COLORS.warning:COLORS.danger, borderRadius:4 }}/>
-                    </div>
-                    <span style={{ fontSize:12 }}>{s.taux_conformite}%</span>
+          {sorted.map(s => (
+            <tr key={s.id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:s,type:"supplier"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <Td style={{ fontWeight:600 }}>{s.nom}</Td>
+              <Td><Badge>{s.statut}</Badge></Td>
+              <Td style={{ color:COLORS.textMuted }}>{s.pays}</Td>
+              <Td>{s.delai_moyen} jours</Td>
+              <Td>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ background:COLORS.bg, borderRadius:4, height:6, width:80, overflow:"hidden" }}>
+                    <div style={{ width:`${s.taux_conformite}%`, height:"100%", background:s.taux_conformite>90?COLORS.accent:s.taux_conformite>80?COLORS.warning:COLORS.danger, borderRadius:4 }}/>
                   </div>
-                </Td>
-                <Td style={{ color:s.taux_retard>15?COLORS.danger:s.taux_retard>8?COLORS.warning:COLORS.text }}>{s.taux_retard}%</Td>
-                <Td><span style={{ fontWeight:700, fontSize:16, color:s.score>85?COLORS.accent:s.score>70?COLORS.warning:COLORS.danger }}>{s.score}</span><span style={{ fontSize:11, color:COLORS.textDim }}>/100</span></Td>
-                <Td style={{ fontSize:12, color:COLORS.textDim }}>{s.email}</Td>
-              </tr>
-            );
-          })}
+                  <span style={{ fontSize:12 }}>{s.taux_conformite}%</span>
+                </div>
+              </Td>
+              <Td style={{ color:s.taux_retard>15?COLORS.danger:s.taux_retard>8?COLORS.warning:COLORS.text }}>{s.taux_retard}%</Td>
+              <Td><span style={{ fontWeight:700, fontSize:16, color:s.score>85?COLORS.accent:s.score>70?COLORS.warning:COLORS.danger }}>{s.score}</span><span style={{ fontSize:11, color:COLORS.textDim }}>/100</span></Td>
+              <Td style={{ fontSize:12, color:COLORS.textDim }}>{s.email}</Td>
+            </tr>
+          ))}
         </tbody>
       </TableContainer>
     </Card>
+
+    {/* Add Supplier Modal */}
+    {showAdd && (
+      <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1005 }}>
+        <div style={{ width:480, background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:16, padding:28, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+          <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:20 }}>Ajouter un fournisseur</div>
+          <InputField label="Nom *" field="nom" placeholder="Ex: AcierPlus Inc."/>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <InputField label="Pays" field="pays" placeholder="Canada"/>
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:4 }}>Statut</label>
+              <div style={{ display:"flex", gap:6 }}>
+                {["actif","inactif"].map(s => (
+                  <button key={s} onClick={()=>setForm(f=>({...f,statut:s}))}
+                    style={{ flex:1, padding:"8px", borderRadius:8, border:`1px solid ${form.statut===s?COLORS.accent:COLORS.border}`,
+                      background:form.statut===s?COLORS.accentGlow:"transparent", color:form.statut===s?COLORS.accent:COLORS.textMuted,
+                      fontSize:12, fontWeight:form.statut===s?600:400, cursor:"pointer" }}>{s}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+            <InputField label="Délai moyen (jours)" field="delai_moyen" placeholder="10"/>
+            <InputField label="Conformité (%)" field="taux_conformite" placeholder="90,5"/>
+            <InputField label="Taux retard (%)" field="taux_retard" placeholder="5,2"/>
+          </div>
+          <InputField label="Email" field="email" placeholder="contact@fournisseur.com"/>
+          <div style={{ fontSize:11, color:COLORS.textDim, marginBottom:16 }}>💡 Les décimales acceptent la virgule et le point (ex: 94,2 ou 94.2)</div>
+          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+            <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:13 }}>Annuler</button>
+            <button onClick={handleAddSupplier} disabled={!form.nom}
+              style={{ padding:"8px 20px", borderRadius:8, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", opacity:form.nom?1:0.5 }}>
+              Ajouter le fournisseur
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
 );
 };
@@ -1035,17 +1317,50 @@ const SuppliersPage = () => {
 // PURCHASE ORDERS
 const PurchaseOrdersPage = () => {
   const COLORS = useTheme();
-  const { pos, transitionPO, setSlideOver } = useData();
+  const { pos, transitionPO, setSlideOver, setPos, addEvent, showToast } = useData();
   const [filter, setFilter] = useState(null);
   const [search, setSearch] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [attachModal, setAttachModal] = useState(null); // PO object
   const { sortCol, sortDir, handleSort, sortData } = useSortable("date_creation","desc");
-  const S = ({ col, children }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>{children}</SortableTh>;
+  const S = ({ col, children, tip }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} tip={tip}>{children}</SortableTh>;
   const filtered = useMemo(() => {
     let data = [...pos];
     if (filter) data = data.filter(p => p.statut === filter);
     if (search) data = data.filter(p => p.po_number.toLowerCase().includes(search.toLowerCase()) || p.article.toLowerCase().includes(search.toLowerCase()));
     return sortData(data);
   }, [filter, search, pos, sortCol, sortDir]);
+
+  const handleImportPOs = (rows) => {
+    let count = 0;
+    const newPOs = rows.map(row => {
+      const sku = row.sku || row.SKU;
+      if (!sku) return null;
+      const item = ITEMS.find(i => i.sku === sku);
+      if (!item) return null;
+      count++;
+      const poId = pos.length + count + 100;
+      return {
+        po_id: poId, po_number: `PO-IMP-${String(poId).padStart(4, '0')}`,
+        sku, article: item.article, supplier_id: parseInt(row.supplier_id) || item.supplier_id || 1,
+        qty: parseInt(row.qty) || 100, statut: "BROUILLON",
+        prix_negocie: parseFloat(row.prix_negocie) || +(item.cout_unitaire * 0.95).toFixed(2),
+        prix_paye: null, date_creation: TODAY, created_by: "Import CSV",
+        commentaire: row.commentaire || "", documents: [],
+      };
+    }).filter(Boolean);
+    setPos(prev => [...prev, ...newPOs]);
+    addEvent("IMPORT_POS", "PurchaseOrder", 0, `Import CSV: ${newPOs.length} POs créés (${rows.length} lignes)`, "INFO");
+    showToast(`Import terminé — ${newPOs.length} POs créés en BROUILLON`);
+    setShowImport(false);
+  };
+
+  const handleAttachDocs = (poId, docs) => {
+    setPos(prev => prev.map(p => p.po_id === poId ? { ...p, documents: [...(p.documents || []), ...docs] } : p));
+    addEvent("DOCUMENT_ATTACHED", "PurchaseOrder", poId, `${docs.length} document(s) joint(s): ${docs.map(d => d.name).join(', ')}`, "INFO");
+    showToast(`${docs.length} document(s) joint(s)`);
+    setAttachModal(null);
+  };
 
   const btnStyle = (borderColor, bgColor, textColor) => ({
     padding:"3px 10px", borderRadius:5, border:`1px solid ${borderColor}`,
@@ -1068,7 +1383,7 @@ const PurchaseOrdersPage = () => {
         <SearchInput value={search} onChange={setSearch}/>
         <FilterPills options={["BROUILLON","A_VALIDER","ENVOYE","RECU","CLOS"]} selected={filter} onSelect={setFilter}/>
       </div>
-      <Card title={`Purchase Orders — ${filtered.length}`} headerRight={<ExportButton data={filtered} columns={[{key:"po_number",label:"PO #"},{key:"article",label:"Article"},{key:"sku",label:"SKU"},{key:r=>SUPPLIER_MAP[r.supplier_id]||"",label:"Fournisseur"},{key:"qty",label:"Qty"},{key:"statut",label:"Statut"},{key:"prix_negocie",label:"Prix négocié"},{key:"prix_paye",label:"Prix payé"},{key:"date_creation",label:"Date création"},{key:"created_by",label:"Créé par"}]} filename="purchase_orders"/>}>
+      <Card title={`Purchase Orders — ${filtered.length}`} headerRight={<div style={{ display:"flex", gap:6 }}><button onClick={()=>setShowImport(true)} style={{ padding:"4px 12px", borderRadius:6, border:`1px solid ${COLORS.info}`, background:`${COLORS.info}15`, color:COLORS.info, fontSize:11, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>📥 Importer CSV</button><ExportButton data={filtered} columns={[{key:"po_number",label:"PO #"},{key:"article",label:"Article"},{key:"sku",label:"SKU"},{key:r=>SUPPLIER_MAP[r.supplier_id]||"",label:"Fournisseur"},{key:"qty",label:"Qty"},{key:"statut",label:"Statut"},{key:"prix_negocie",label:"Prix négocié"},{key:"prix_paye",label:"Prix payé"},{key:"date_creation",label:"Date création"},{key:"created_by",label:"Créé par"}]} filename="purchase_orders"/></div>}>
         <TableContainer>
           <thead><tr><S col="po_number">PO #</S><S col="article">Article</S><S col="supplier_id">Fournisseur</S><S col="qty">Qty</S><S col="statut">Statut</S><S col="prix_negocie">Prix négocié</S><S col="prix_paye">Prix payé</S><S col="date_creation">Date création</S><S col="created_by">Créé par</S><Th>Actions</Th></tr></thead>
           <tbody>
@@ -1084,12 +1399,16 @@ const PurchaseOrdersPage = () => {
                 <Td style={{ color:COLORS.textMuted, fontSize:12 }}>{po.date_creation}</Td>
                 <Td style={{ color:COLORS.textMuted, fontSize:12 }}>{po.created_by}</Td>
                 <Td>
-                  <div onClick={e=>e.stopPropagation()} style={{ display:"flex", gap:4 }}>
+                  <div onClick={e=>e.stopPropagation()} style={{ display:"flex", gap:4, alignItems:"center" }}>
                     {po.statut==="BROUILLON" && <ActionBtn onClick={()=>transitionPO(po.po_id)} borderColor={COLORS.warning} bgColor={COLORS.warningDim} textColor={COLORS.warning}>Valider</ActionBtn>}
                     {po.statut==="A_VALIDER" && <ActionBtn onClick={()=>transitionPO(po.po_id)} borderColor={COLORS.info} bgColor={COLORS.infoDim} textColor={COLORS.info}>Envoyer</ActionBtn>}
                     {po.statut==="ENVOYE" && <ActionBtn onClick={()=>transitionPO(po.po_id)} borderColor={COLORS.accent} bgColor={COLORS.accentGlow} textColor={COLORS.accent}>Réceptionner</ActionBtn>}
                     {po.statut==="RECU" && <ActionBtn onClick={()=>transitionPO(po.po_id)} borderColor={COLORS.purple} bgColor={COLORS.purpleDim} textColor={COLORS.purple}>Clore</ActionBtn>}
                     {po.statut==="CLOS" && <span style={{ fontSize:10, color:COLORS.textDim }}>—</span>}
+                    <button onClick={()=>setAttachModal(po)} title="Joindre un document"
+                      style={{ padding:"3px 6px", borderRadius:4, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:12, position:"relative" }}>
+                      📎{po.documents && po.documents.length > 0 && <span style={{ position:"absolute", top:-4, right:-4, minWidth:14, height:14, borderRadius:7, background:COLORS.accent, color:"white", fontSize:8, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center" }}>{po.documents.length}</span>}
+                    </button>
                   </div>
                 </Td>
               </tr>
@@ -1097,6 +1416,8 @@ const PurchaseOrdersPage = () => {
           </tbody>
         </TableContainer>
       </Card>
+      {showImport && <ImportModal type="orders" onClose={()=>setShowImport(false)} onImport={handleImportPOs}/>}
+      {attachModal && <DocumentAttachModal po={attachModal} onClose={()=>setAttachModal(null)} onAttach={handleAttachDocs}/>}
     </div>
   );
 };
@@ -1104,10 +1425,10 @@ const PurchaseOrdersPage = () => {
 // TASKS
 const TasksPage = () => {
   const COLORS = useTheme();
-  const { tasks, pos } = useData();
+  const { tasks, pos, setSlideOver } = useData();
   const [filter, setFilter] = useState(null);
   const { sortCol, sortDir, handleSort, sortData } = useSortable("due_at","asc");
-  const S = ({ col, children }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort}>{children}</SortableTh>;
+  const S = ({ col, children, tip }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} tip={tip}>{children}</SortableTh>;
   const base = filter ? tasks.filter(t=>t.status===filter) : tasks;
   const filtered = sortData(base);
   return (
@@ -1124,15 +1445,15 @@ const TasksPage = () => {
           <tbody>
             {filtered.map(t => {
               const po = pos.find(p=>p.po_id===t.related_po_id);
-              const overdue = new Date(t.due_at) < new Date("2026-03-14") && t.status !== "Terminée";
+              const overdue = new Date(t.due_at) < new Date(TODAY) && t.status !== "Terminée";
               return (
-                <tr key={t.task_id} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <tr key={t.task_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:t,type:"task"})} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <Td style={{ fontWeight:500 }}>{t.type}</Td>
                   <Td style={{ color:COLORS.accent, fontWeight:600 }}>{po?.po_number||"—"}</Td>
                   <Td>{t.assigned_to}</Td>
                   <Td><Badge>{t.status}</Badge></Td>
-                  <Td style={{ color:overdue?COLORS.danger:COLORS.textMuted, fontWeight:overdue?600:400 }}>{t.due_at}{overdue && " ⚠"}</Td>
-                  <Td style={{ color:COLORS.textDim, maxWidth:250, overflow:"hidden", textOverflow:"ellipsis" }}>{t.comment}</Td>
+                  <Td style={{ color:overdue?COLORS.danger:COLORS.textMuted, fontWeight:overdue?600:400 }}>{formatDate(t.due_at)}{overdue && " ⚠"}</Td>
+                  <Td style={{ color:COLORS.textDim, maxWidth:250, overflow:"hidden", textOverflow:"ellipsis" }}>{t.comment}{t.comments?.length > 0 && <span style={{ marginLeft:6, fontSize:9, color:COLORS.accent }}>💬 {t.comments.length}</span>}</Td>
                 </tr>
               );
             })}
@@ -1146,7 +1467,7 @@ const TasksPage = () => {
 // AUDIT LOG
 const AuditPage = () => {
   const COLORS = useTheme();
-  const { events, statusHistory } = useData();
+  const { events, statusHistory, setSlideOver } = useData();
   const [levelFilter, setLevelFilter] = useState(null);
   const evSort = useSortable("date","desc");
   const SE = ({ col, children }) => <SortableTh col={col} sortCol={evSort.sortCol} sortDir={evSort.sortDir} onSort={evSort.handleSort}>{children}</SortableTh>;
@@ -1169,14 +1490,14 @@ const AuditPage = () => {
           <thead><tr><SE col="date">Date</SE><SE col="level">Niveau</SE><SE col="type_event">Type</SE><SE col="utilisateur">Utilisateur</SE><SE col="entite">Entité</SE><SE col="entite_id">ID</SE><SE col="details">Détails</SE></tr></thead>
           <tbody>
             {filtered.map(e => (
-              <tr key={e.event_id} onMouseEnter={ev=>ev.currentTarget.style.background=COLORS.cardHover} onMouseLeave={ev=>ev.currentTarget.style.background="transparent"}>
+              <tr key={e.event_id} style={{ cursor:"pointer" }} onClick={()=>setSlideOver({data:e,type:"event"})} onMouseEnter={ev=>ev.currentTarget.style.background=COLORS.cardHover} onMouseLeave={ev=>ev.currentTarget.style.background="transparent"}>
                 <Td style={{ fontSize:12, color:COLORS.textMuted, whiteSpace:"nowrap" }}>{e.date}</Td>
                 <Td><Badge>{e.level}</Badge></Td>
                 <Td style={{ fontSize:12, fontWeight:500 }}>{e.type_event}</Td>
                 <Td>{e.utilisateur}</Td>
                 <Td style={{ color:COLORS.textDim }}>{e.entite}</Td>
                 <Td style={{ color:COLORS.textDim }}>#{e.entite_id}</Td>
-                <Td style={{ fontSize:12, color:COLORS.textMuted, maxWidth:350, overflow:"hidden", textOverflow:"ellipsis" }}>{e.details}</Td>
+                <Td style={{ fontSize:12, color:COLORS.textMuted, maxWidth:350, overflow:"hidden", textOverflow:"ellipsis" }}>{e.details}{e.notes?.length > 0 && <span style={{ marginLeft:6, fontSize:9, color:COLORS.accent }}>📝 {e.notes.length}</span>}</Td>
               </tr>
             ))}
           </tbody>
@@ -1207,9 +1528,16 @@ const AuditPage = () => {
   );
 };
 
-// SETTINGS / RULES
+// SETTINGS / RULES / ADMIN
 const SettingsPage = () => {
   const COLORS = useTheme();
+  const auth = useAuth();
+  const { showToast, addEvent } = useData();
+  const [tab, setTab] = useState("rules");
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [userForm, setUserForm] = useState({ username:"", password:"", nom:"", poste:"", role:"entrepot" });
+  const [pwForm, setPwForm] = useState({ current:"", newPw:"", confirm:"" });
+
   const rules = [
     { id:1, name:"Réapprovisionnement automatique", condition:"Classe A/B + Stock < Seuil min + Fournisseur actif", action:"Créer PO brouillon + Tâche validation + Log audit", active:true },
     { id:2, name:"Garde-fou PO unique", condition:"Un seul PO BROUILLON ou A_VALIDER par SKU", action:"Bloquer création + Log warning", active:true },
@@ -1221,48 +1549,228 @@ const SettingsPage = () => {
     { id:8, name:"PO clos immuable", condition:"PO.statut == CLOS → modification", action:"Bloquer modification + Log violation", active:true },
   ];
 
+  const formulas = [
+    { name:"EOQ", formula:"√((2 × D × S) / H)", desc:"D = demande annuelle, S = coût commande, H = coût unitaire × taux possession" },
+    { name:"ROP", formula:"(D/365 × Lead time) + Stock sécurité", desc:"Point de réapprovisionnement avec marge sécurité" },
+    { name:"Couverture", formula:"Stock net / (D / 365)", desc:"Nombre de jours de stock restant au rythme actuel" },
+    { name:"Classification ABC", formula:"Pareto sur valeur annuelle (D × Coût)", desc:"A ≤ 80% cumulé, B ≤ 95%, C > 95%" },
+    { name:"TRS", formula:"Disponibilité × Performance × Qualité", desc:"Taux de rendement synthétique (OEE)" },
+    { name:"Disponibilité", formula:"(Temps planifié − Arrêts) / Temps planifié", desc:"Temps réellement productif vs temps prévu" },
+    { name:"Performance", formula:"(Qté / Temps fonct.) / Cadence théorique", desc:"Ratio cadence réelle vs nominale" },
+    { name:"Score fournisseur", formula:"Conformité×0.6 + (100−Retard)×0.2 + Rapidité×0.2", desc:"Score composite sur 100" },
+  ];
+
+  const kpiDefs = [
+    { name:"Taux de service", def:"% d'articles avec stock ≥ seuil minimum. Mesure la capacité à servir les demandes sans rupture.", cible:"≥ 95%", page:"Dashboard" },
+    { name:"Couverture moyenne", def:"Nombre moyen de jours de stock restant sur l'ensemble des articles. Indicateur de santé globale du stock.", cible:"30–45 jours", page:"Dashboard" },
+    { name:"Articles critiques", def:"Articles en rupture, sous seuil, ou avec couverture < 15 jours pour les classes A/B.", cible:"< 10% du total", page:"Articles critiques" },
+    { name:"Précision inventaire", def:"% d'articles comptés dont l'écart est dans la tolérance (A: ±5%, B: ±10%, C: ±15%).", cible:"A ≥ 95%, B ≥ 90%, C ≥ 85%", page:"Inventaire tournant" },
+    { name:"TRS", def:"Taux de rendement synthétique. Produit de Disponibilité × Performance × Qualité.", cible:"≥ 85% (World Class)", page:"Performance TRS" },
+    { name:"Délai moyen fournisseur", def:"Nombre moyen de jours entre l'envoi du PO et la réception.", cible:"< 10 jours", page:"Fournisseurs" },
+    { name:"Taux de conformité", def:"% de commandes reçues conformes aux spécifications (qualité, quantité).", cible:"≥ 95%", page:"Fournisseurs" },
+    { name:"PO à traiter", def:"Nombre de POs en statut BROUILLON ou A_VALIDER nécessitant une action.", cible:"< 5", page:"Purchase Orders" },
+  ];
+
+  const handleAddUser = () => {
+    if (!userForm.username || !userForm.password || !userForm.nom) return;
+    const initials = userForm.nom.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const colors = ["#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6","#06b6d4"];
+    const newUser = {
+      id: USERS.length + 1, username: userForm.username, password: userForm.password,
+      role: userForm.role, nom: userForm.nom, poste: userForm.poste || (userForm.role === "admin" ? "Gestionnaire" : "Préposé entrepôt"),
+      initials, color: colors[USERS.length % colors.length],
+    };
+    USERS.push(newUser);
+    addEvent("USER_CREATED", "User", newUser.id, `Profil créé: ${newUser.nom} (${newUser.role})`, "INFO");
+    showToast(`Utilisateur "${newUser.nom}" créé`);
+    setUserForm({ username:"", password:"", nom:"", poste:"", role:"entrepot" });
+    setShowAddUser(false);
+  };
+
+  const handleChangePw = () => {
+    const user = USERS.find(u => u.id === auth.user.id);
+    if (!user || pwForm.current !== user.password) { showToast("Mot de passe actuel incorrect", "error"); return; }
+    if (pwForm.newPw.length < 4) { showToast("Minimum 4 caractères", "error"); return; }
+    if (pwForm.newPw !== pwForm.confirm) { showToast("Les mots de passe ne correspondent pas", "error"); return; }
+    user.password = pwForm.newPw;
+    showToast("Mot de passe modifié");
+    setPwForm({ current:"", newPw:"", confirm:"" });
+  };
+
+  const Tab = ({ id, label }) => (
+    <button onClick={() => setTab(id)}
+      style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${tab === id ? COLORS.accent : COLORS.border}`,
+        background:tab === id ? COLORS.accentGlow : "transparent", color:tab === id ? COLORS.accent : COLORS.textMuted,
+        fontSize:12, fontWeight:tab === id ? 600 : 400, cursor:"pointer", transition:"all 0.15s" }}>{label}</button>
+  );
+
+  const Input = ({ label, value, onChange, type="text", placeholder="" }) => (
+    <div style={{ marginBottom:12 }}>
+      <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:4 }}>{label}</label>
+      <input value={value} onChange={onChange} type={type} placeholder={placeholder}
+        style={{ width:"100%", padding:"8px 12px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.text, fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" }}/>
+    </div>
+  );
+
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      <Card title="Moteur de règles — Garde-fous métier">
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {rules.map(r => (
-            <div key={r.id} style={{ background:COLORS.surface, borderRadius:12, padding:16, border:`1px solid ${COLORS.border}`, display:"flex", gap:16, alignItems:"flex-start" }}>
-              <div style={{ width:40, height:40, borderRadius:10, background:r.active?COLORS.accentGlow:COLORS.dangerDim, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:16, fontWeight:700, color:r.active?COLORS.accent:COLORS.danger }}>
-                {r.id}
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontWeight:600, color:COLORS.text, marginBottom:6 }}>{r.name}</div>
-                <div style={{ fontSize:12, color:COLORS.textMuted, marginBottom:4 }}>
-                  <span style={{ color:COLORS.info, fontWeight:500 }}>SI</span> {r.condition}
-                </div>
-                <div style={{ fontSize:12, color:COLORS.textMuted }}>
-                  <span style={{ color:COLORS.warning, fontWeight:500 }}>ALORS</span> {r.action}
-                </div>
-              </div>
-              <div style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:600, background:r.active?COLORS.accentGlow:"rgba(107,114,128,0.15)", color:r.active?COLORS.accent:"#9ca3af", border:`1px solid ${r.active?COLORS.accentDim:"rgba(107,114,128,0.3)"}` }}>
-                {r.active?"ACTIF":"INACTIF"}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+        <Tab id="rules" label="Moteur de règles"/><Tab id="formulas" label="Formules"/><Tab id="kpis" label="Définitions KPI"/><Tab id="users" label="Gestion profils"/><Tab id="password" label="Mon compte"/>
+      </div>
 
-      <Card title="Formules EOQ / ROP">
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-          {[
-            { name:"EOQ", formula:"√((2 × D × S) / H)", desc:"D = demande annuelle, S = coût commande, H = coût possession annuel" },
-            { name:"ROP", formula:"(D/365 × Lead time) + Stock sécurité", desc:"Point de réapprovisionnement avec marge sécurité" },
-            { name:"Couverture", formula:"Stock net / (D / 365)", desc:"Nombre de jours de stock restant" },
-            { name:"Classification ABC", formula:"Pareto sur valeur annuelle", desc:"A ≤ 80%, B ≤ 95%, C > 95% cumul" },
-          ].map(f => (
-            <div key={f.name} style={{ background:COLORS.surface, borderRadius:12, padding:16, border:`1px solid ${COLORS.border}` }}>
-              <div style={{ fontWeight:700, color:COLORS.accent, marginBottom:6 }}>{f.name}</div>
-              <div style={{ fontFamily:"'Courier New', monospace", fontSize:14, color:COLORS.text, marginBottom:6, padding:"8px 12px", background:COLORS.bg, borderRadius:8, border:`1px solid ${COLORS.border}` }}>{f.formula}</div>
-              <div style={{ fontSize:12, color:COLORS.textDim }}>{f.desc}</div>
+      {/* RULES */}
+      {tab === "rules" && (
+        <Card title={`Moteur de règles — ${rules.length} garde-fous`}>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {rules.map(r => (
+              <div key={r.id} style={{ background:COLORS.surface, borderRadius:12, padding:16, border:`1px solid ${COLORS.border}`, display:"flex", gap:16, alignItems:"flex-start" }}>
+                <div style={{ width:40, height:40, borderRadius:10, background:COLORS.accentGlow, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:16, fontWeight:700, color:COLORS.accent }}>{r.id}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:600, color:COLORS.text, marginBottom:6 }}>{r.name}</div>
+                  <div style={{ fontSize:12, color:COLORS.textMuted, marginBottom:4 }}><span style={{ color:COLORS.info, fontWeight:500 }}>SI</span> {r.condition}</div>
+                  <div style={{ fontSize:12, color:COLORS.textMuted }}><span style={{ color:COLORS.warning, fontWeight:500 }}>ALORS</span> {r.action}</div>
+                </div>
+                <span style={{ padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:600, background:COLORS.accentGlow, color:COLORS.accent, border:`1px solid ${COLORS.accentDim}` }}>ACTIF</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* FORMULAS */}
+      {tab === "formulas" && (
+        <Card title={`Formules — ${formulas.length} calculs`}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+            {formulas.map(f => (
+              <div key={f.name} style={{ background:COLORS.surface, borderRadius:12, padding:16, border:`1px solid ${COLORS.border}` }}>
+                <div style={{ fontWeight:700, color:COLORS.accent, marginBottom:6, fontSize:14 }}>{f.name}</div>
+                <div style={{ fontFamily:"'Courier New', monospace", fontSize:13, color:COLORS.text, marginBottom:8, padding:"8px 12px", background:COLORS.bg, borderRadius:8, border:`1px solid ${COLORS.border}` }}>{f.formula}</div>
+                <div style={{ fontSize:12, color:COLORS.textDim }}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* KPI DEFINITIONS */}
+      {tab === "kpis" && (
+        <Card title={`Définitions KPI — ${kpiDefs.length} indicateurs`}>
+          <TableContainer>
+            <thead><tr><Th>KPI</Th><Th>Définition</Th><Th>Cible</Th><Th>Page</Th></tr></thead>
+            <tbody>
+              {kpiDefs.map(k => (
+                <tr key={k.name} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <Td style={{ fontWeight:600, color:COLORS.accent, whiteSpace:"nowrap" }}>{k.name}</Td>
+                  <Td style={{ fontSize:12, color:COLORS.textMuted, maxWidth:400 }}>{k.def}</Td>
+                  <Td style={{ fontWeight:600, color:COLORS.accent, whiteSpace:"nowrap" }}>{k.cible}</Td>
+                  <Td style={{ fontSize:12, color:COLORS.textDim }}>{k.page}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </TableContainer>
+        </Card>
+      )}
+
+      {/* USER MANAGEMENT */}
+      {tab === "users" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <Card title="Profils utilisateurs" headerRight={<button onClick={()=>setShowAddUser(true)} style={{ padding:"4px 14px", borderRadius:6, border:`1px solid ${COLORS.accent}`, background:COLORS.accentGlow, color:COLORS.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}>+ Nouveau profil</button>}>
+            <TableContainer>
+              <thead><tr><Th>Utilisateur</Th><Th>Nom complet</Th><Th>Poste</Th><Th>Rôle</Th><Th>Pages accessibles</Th></tr></thead>
+              <tbody>
+                {USERS.map(u => (
+                  <tr key={u.id} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <Td>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                        <div style={{ width:30, height:30, borderRadius:8, background:`linear-gradient(135deg, ${u.color}, ${u.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:700, fontSize:11 }}>{u.initials}</div>
+                        <span style={{ fontFamily:"monospace", fontSize:12, color:COLORS.text }}>{u.username}</span>
+                      </div>
+                    </Td>
+                    <Td style={{ fontWeight:500 }}>{u.nom}</Td>
+                    <Td style={{ color:COLORS.textMuted }}>{u.poste}</Td>
+                    <Td><Badge>{u.role}</Badge></Td>
+                    <Td style={{ fontSize:11, color:COLORS.textDim }}>{u.role === "admin" ? "Toutes les pages" : "Tableau de bord, Inventaire, Commandes, Comptages, Stats"}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </TableContainer>
+          </Card>
+
+          {/* Permission matrix */}
+          <Card title="Matrice des permissions">
+            <TableContainer>
+              <thead><tr><Th>Page</Th><Th>Admin</Th><Th>Entrepôt</Th></tr></thead>
+              <tbody>
+                {[
+                  {page:"Dashboard",admin:true,entrepot:false},{page:"Inventaire",admin:true,entrepot:true},
+                  {page:"Articles critiques",admin:true,entrepot:false},{page:"Fournisseurs",admin:true,entrepot:false},
+                  {page:"Purchase Orders",admin:true,entrepot:false},{page:"Tâches",admin:true,entrepot:false},
+                  {page:"Journal d'audit",admin:true,entrepot:false},{page:"Performance TRS",admin:true,entrepot:false},
+                  {page:"Mon tableau de bord",admin:false,entrepot:true},{page:"Commandes internes",admin:true,entrepot:true},
+                  {page:"Inventaire tournant",admin:true,entrepot:true},{page:"Mes statistiques",admin:false,entrepot:true},
+                  {page:"Règles / Config",admin:true,entrepot:false},
+                ].map(p => (
+                  <tr key={p.page} onMouseEnter={e=>e.currentTarget.style.background=COLORS.cardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <Td style={{ fontWeight:500 }}>{p.page}</Td>
+                    <Td>{p.admin ? <span style={{ color:COLORS.accent }}>✓</span> : <span style={{ color:COLORS.textDim }}>—</span>}</Td>
+                    <Td>{p.entrepot ? <span style={{ color:COLORS.accent }}>✓</span> : <span style={{ color:COLORS.textDim }}>—</span>}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </TableContainer>
+          </Card>
+
+          {/* Add user modal */}
+          {showAddUser && (
+            <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1005 }}>
+              <div style={{ width:460, background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:16, padding:28, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+                <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:20 }}>Créer un profil</div>
+                <Input label="Nom d'utilisateur *" value={userForm.username} onChange={e=>setUserForm(f=>({...f,username:e.target.value}))} placeholder="ex: marie.lavoie"/>
+                <Input label="Mot de passe *" value={userForm.password} onChange={e=>setUserForm(f=>({...f,password:e.target.value}))} type="password" placeholder="Min. 4 caractères"/>
+                <Input label="Nom complet *" value={userForm.nom} onChange={e=>setUserForm(f=>({...f,nom:e.target.value}))} placeholder="Prénom Nom"/>
+                <Input label="Poste" value={userForm.poste} onChange={e=>setUserForm(f=>({...f,poste:e.target.value}))} placeholder="ex: Analyste achats"/>
+                <div style={{ marginBottom:16 }}>
+                  <label style={{ fontSize:12, fontWeight:500, color:COLORS.textMuted, display:"block", marginBottom:6 }}>Rôle</label>
+                  <div style={{ display:"flex", gap:8 }}>
+                    {[{id:"admin",label:"Admin — Accès complet"},{id:"entrepot",label:"Entrepôt — Accès limité"}].map(r => (
+                      <button key={r.id} onClick={()=>setUserForm(f=>({...f,role:r.id}))}
+                        style={{ flex:1, padding:"10px", borderRadius:8, border:`1px solid ${userForm.role===r.id?COLORS.accent:COLORS.border}`,
+                          background:userForm.role===r.id?COLORS.accentGlow:"transparent", color:userForm.role===r.id?COLORS.accent:COLORS.textMuted,
+                          fontSize:12, fontWeight:userForm.role===r.id?600:400, cursor:"pointer" }}>{r.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+                  <button onClick={()=>setShowAddUser(false)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:13 }}>Annuler</button>
+                  <button onClick={handleAddUser} disabled={!userForm.username||!userForm.password||!userForm.nom}
+                    style={{ padding:"8px 20px", borderRadius:8, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", opacity:userForm.username&&userForm.password&&userForm.nom?1:0.5 }}>Créer le profil</button>
+                </div>
+              </div>
             </div>
-          ))}
+          )}
         </div>
-      </Card>
+      )}
+
+      {/* PASSWORD */}
+      {tab === "password" && (
+        <Card title="Mon compte">
+          <div style={{ maxWidth:400 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+              <div style={{ width:48, height:48, borderRadius:14, background:`linear-gradient(135deg, ${auth.user.color}, ${auth.user.color}aa)`, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:700, fontSize:18 }}>{auth.user.initials}</div>
+              <div>
+                <div style={{ fontSize:16, fontWeight:600, color:COLORS.text }}>{auth.user.nom}</div>
+                <div style={{ fontSize:12, color:COLORS.textMuted }}>{auth.user.poste} · {auth.user.role}</div>
+              </div>
+            </div>
+            <div style={{ fontSize:13, fontWeight:600, color:COLORS.text, marginBottom:12 }}>Changer le mot de passe</div>
+            <Input label="Mot de passe actuel" value={pwForm.current} onChange={e=>setPwForm(f=>({...f,current:e.target.value}))} type="password"/>
+            <Input label="Nouveau mot de passe" value={pwForm.newPw} onChange={e=>setPwForm(f=>({...f,newPw:e.target.value}))} type="password"/>
+            <Input label="Confirmer le nouveau mot de passe" value={pwForm.confirm} onChange={e=>setPwForm(f=>({...f,confirm:e.target.value}))} type="password"/>
+            <button onClick={handleChangePw} disabled={!pwForm.current||!pwForm.newPw||!pwForm.confirm}
+              style={{ padding:"10px 24px", borderRadius:10, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", opacity:pwForm.current&&pwForm.newPw&&pwForm.confirm?1:0.5, marginTop:8 }}>Modifier le mot de passe</button>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
@@ -1750,11 +2258,11 @@ const TRSPage = () => {
       {/* Gauges + Inputs */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
         <Card title="Jauges de performance">
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:12, padding:"12px 0" }}>
-            <GaugeChart value={dispo} label="Disponibilité" color={dispo>=90?COLORS.accent:COLORS.warning}/>
-            <GaugeChart value={Math.min(perf,100)} label="Performance" color={perf>=95?COLORS.accent:COLORS.info}/>
-            <GaugeChart value={qual} label="Qualité" color={qual>=99?COLORS.accent:qual>=95?COLORS.info:COLORS.warning}/>
-            <GaugeChart value={Math.min(trs,100)} label="TRS" color={trsColor}/>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:16, padding:"12px 0" }}>
+            <GaugeChart value={dispo} label="Disponibilité" color="#10B981"/>
+            <GaugeChart value={Math.min(perf,100)} label="Performance" color="#3B82F6"/>
+            <GaugeChart value={qual} label="Qualité" color="#A855F7"/>
+            <GaugeChart value={Math.min(trs,100)} label="TRS" color="#F59E0B"/>
           </div>
         </Card>
 
@@ -1787,9 +2295,9 @@ const TRSPage = () => {
             <Legend wrapperStyle={{ fontSize:11, color:COLORS.textMuted }}/>
             <Line type="monotone" dataKey="dispo" name="Disponibilité" stroke="#10B981" strokeWidth={2} dot={{ r:4 }}/>
             <Line type="monotone" dataKey="perf" name="Performance" stroke="#3B82F6" strokeWidth={2} dot={{ r:4 }}/>
-            <Line type="monotone" dataKey="qual" name="Qualité" stroke="#8B5CF6" strokeWidth={2} dot={{ r:4 }}/>
-            <Bar dataKey="trs" name="TRS" fill={COLORS.accent} fillOpacity={0.2} radius={[4,4,0,0]} barSize={30}/>
-            <Line type="monotone" dataKey="trs" name="TRS (ligne)" stroke={COLORS.accent} strokeWidth={3} dot={{ r:5, fill:COLORS.accent }} strokeDasharray=""/>
+            <Line type="monotone" dataKey="qual" name="Qualité" stroke="#A855F7" strokeWidth={2} dot={{ r:4 }}/>
+            <Bar dataKey="trs" name="TRS" fill="#F59E0B" fillOpacity={0.25} radius={[4,4,0,0]} barSize={30}/>
+            <Line type="monotone" dataKey="trs" name="TRS (ligne)" stroke="#F59E0B" strokeWidth={3} dot={{ r:5, fill:"#F59E0B" }} strokeDasharray=""/>
           </ComposedChart>
         </ResponsiveContainer>
       </Card>
@@ -1923,7 +2431,7 @@ const CycleCountPage = () => {
     const finalStatut = isCritical ? "Investigation" : statut;
 
     const newCount = {
-      id: counts.length + 1, sku, date: "2026-03-14",
+      id: counts.length + 1, sku, date: TODAY,
       stock_systeme: stockSys, stock_compte: stockCompte,
       ecart, ecart_pct: ecartPct, statut: finalStatut,
       compteur: "Jean Dupont", cause, zone, actions, comment,
@@ -2316,6 +2824,195 @@ const CycleCountPage = () => {
   );
 };
 
+// ─── IMPORT SYSTEM (Admin only) ──────────────────────────────────────────────
+const parseCSV = (text) => {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return { headers: [], rows: [] };
+  const headers = lines[0].split(/[,;\t]/).map(h => h.trim().replace(/^"|"$/g, ''));
+  const rows = lines.slice(1).map(line => {
+    const vals = line.split(/[,;\t]/).map(v => v.trim().replace(/^"|"$/g, ''));
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
+    return obj;
+  }).filter(r => Object.values(r).some(v => v !== ""));
+  return { headers, rows };
+};
+
+const ImportModal = ({ type, onClose, onImport }) => {
+  const COLORS = useTheme();
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  const expectedCols = type === "items"
+    ? ["sku","nom","famille","demande_annuelle","cout_unitaire","cout_commande","stock_net","seuil_min","stock_securite","lead_time_jours"]
+    : ["sku","supplier_id","qty","prix_negocie","commentaire"];
+
+  const handleFile = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setFile(f); setError("");
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const { headers, rows } = parseCSV(ev.target.result);
+        if (rows.length === 0) { setError("Fichier vide ou format invalide"); return; }
+        setPreview({ headers, rows: rows.slice(0, 5), totalRows: rows.length, allRows: rows });
+      } catch (err) { setError("Erreur de lecture: " + err.message); }
+    };
+    reader.readAsText(f, 'UTF-8');
+  };
+
+  const handleImport = () => {
+    if (!preview) return;
+    setImporting(true);
+    setTimeout(() => { onImport(preview.allRows); setImporting(false); }, 500);
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1005 }}>
+      <div style={{ width:640, maxHeight:"85vh", overflowY:"auto", background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:16, padding:28, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <div>
+            <div style={{ fontSize:18, fontWeight:700, color:COLORS.text }}>{type === "items" ? "📥 Importer des articles" : "📥 Importer des commandes"}</div>
+            <div style={{ fontSize:12, color:COLORS.textDim, marginTop:4 }}>Format : CSV (séparateur virgule, point-virgule ou tabulation)</div>
+          </div>
+          <button onClick={onClose} style={{ padding:"4px 8px", borderRadius:6, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:16 }}>✕</button>
+        </div>
+
+        <div style={{ background:COLORS.surface, borderRadius:10, padding:14, border:`1px solid ${COLORS.border}`, marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:8 }}>Colonnes attendues</div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+            {expectedCols.map(c => <span key={c} style={{ padding:"3px 10px", borderRadius:5, fontSize:11, background:COLORS.bg, color:COLORS.accent, border:`1px solid ${COLORS.border}`, fontFamily:"monospace" }}>{c}</span>)}
+          </div>
+        </div>
+
+        <label style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px", borderRadius:12, border:`2px dashed ${file ? COLORS.accent : COLORS.border}`, background:file ? COLORS.accentGlow : "transparent", cursor:"pointer", transition:"all 0.15s", marginBottom:16 }}>
+          <input type="file" accept=".csv,.tsv,.txt" onChange={handleFile} style={{ display:"none" }}/>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:28, marginBottom:6 }}>{file ? "✅" : "📄"}</div>
+            <div style={{ fontSize:13, color:file ? COLORS.accent : COLORS.textMuted, fontWeight:file ? 600 : 400 }}>{file ? file.name : "Cliquer pour sélectionner un fichier CSV"}</div>
+            {file && <div style={{ fontSize:11, color:COLORS.textDim, marginTop:4 }}>{(file.size / 1024).toFixed(1)} Ko</div>}
+          </div>
+        </label>
+
+        {error && <div style={{ padding:"10px 14px", borderRadius:8, background:"rgba(239,68,68,0.15)", border:"1px solid rgba(239,68,68,0.3)", color:"#EF4444", fontSize:12, marginBottom:16 }}>{error}</div>}
+
+        {preview && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:COLORS.text, marginBottom:8 }}>Aperçu — {preview.totalRows} lignes détectées</div>
+            <div style={{ overflowX:"auto", borderRadius:8, border:`1px solid ${COLORS.border}` }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
+                <thead><tr style={{ background:COLORS.surface }}>{preview.headers.map(h => <th key={h} style={{ padding:"8px 10px", textAlign:"left", color:COLORS.textMuted, fontWeight:600, borderBottom:`1px solid ${COLORS.border}`, whiteSpace:"nowrap" }}>{h}</th>)}</tr></thead>
+                <tbody>{preview.rows.map((row, i) => (
+                  <tr key={i}>{preview.headers.map(h => <td key={h} style={{ padding:"6px 10px", color:COLORS.text, borderBottom:`1px solid ${COLORS.border}22`, maxWidth:120, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{row[h]}</td>)}</tr>
+                ))}</tbody>
+              </table>
+            </div>
+            {preview.totalRows > 5 && <div style={{ fontSize:11, color:COLORS.textDim, marginTop:6 }}>... et {preview.totalRows - 5} lignes supplémentaires</div>}
+          </div>
+        )}
+
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:13 }}>Annuler</button>
+          <button onClick={handleImport} disabled={!preview || importing}
+            style={{ padding:"8px 20px", borderRadius:8, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer", opacity:preview && !importing ? 1 : 0.5 }}>
+            {importing ? "Import en cours..." : `Importer ${preview ? preview.totalRows : 0} lignes`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DocumentAttachModal = ({ po, onClose, onAttach }) => {
+  const COLORS = useTheme();
+  const [files, setFiles] = useState([]);
+  const [docType, setDocType] = useState("Bon de livraison");
+  const DOC_TYPES = ["Bon de livraison","Facture fournisseur","Bon de réception","Photo","Certificat qualité","Autre"];
+
+  const handleFiles = (e) => {
+    const newFiles = Array.from(e.target.files).map(f => ({
+      name: f.name, size: f.size, type: docType, uploadedAt: TODAY, uploadedBy: "Jean Dupont",
+    }));
+    setFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const handleAttach = () => {
+    if (files.length === 0) return;
+    onAttach(po.po_id, files);
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1005 }}>
+      <div style={{ width:500, background:COLORS.card, border:`1px solid ${COLORS.border}`, borderRadius:16, padding:28, boxShadow:"0 20px 60px rgba(0,0,0,0.4)" }}>
+        <div style={{ fontSize:18, fontWeight:700, color:COLORS.text, marginBottom:4 }}>📎 Joindre des documents</div>
+        <div style={{ fontSize:13, color:COLORS.textMuted, marginBottom:20 }}>
+          <strong style={{ color:COLORS.accent }}>{po.po_number}</strong> — {po.article}
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:12, fontWeight:600, color:COLORS.text, marginBottom:8 }}>Type de document</div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+            {DOC_TYPES.map(t => (
+              <button key={t} onClick={() => setDocType(t)}
+                style={{ padding:"5px 12px", borderRadius:6, border:`1px solid ${docType === t ? COLORS.accent : COLORS.border}`,
+                  background:docType === t ? COLORS.accentGlow : "transparent", color:docType === t ? COLORS.accent : COLORS.textMuted,
+                  fontSize:11, cursor:"pointer", transition:"all 0.15s" }}>{t}</button>
+            ))}
+          </div>
+        </div>
+
+        <label style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"20px 16px", borderRadius:12, border:`2px dashed ${COLORS.border}`, cursor:"pointer", marginBottom:16 }}>
+          <input type="file" multiple onChange={handleFiles} style={{ display:"none" }}/>
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:24, marginBottom:4 }}>📁</div>
+            <div style={{ fontSize:12, color:COLORS.textMuted }}>Cliquer pour ajouter des fichiers</div>
+          </div>
+        </label>
+
+        {files.length > 0 && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:COLORS.text, marginBottom:8 }}>{files.length} document{files.length > 1 ? "s" : ""} prêt{files.length > 1 ? "s" : ""}</div>
+            {files.map((f, i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:8, background:COLORS.surface, border:`1px solid ${COLORS.border}`, marginBottom:4 }}>
+                <span style={{ fontSize:16 }}>{f.type === "Photo" ? "📷" : f.type === "Facture fournisseur" ? "🧾" : "📄"}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:500, color:COLORS.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.name}</div>
+                  <div style={{ fontSize:10, color:COLORS.textDim }}>{f.type} · {(f.size / 1024).toFixed(1)} Ko</div>
+                </div>
+                <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                  style={{ padding:"2px 6px", borderRadius:4, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textDim, cursor:"pointer", fontSize:10 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Already attached */}
+        {po.documents && po.documents.length > 0 && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:COLORS.textMuted, marginBottom:8 }}>Documents déjà joints ({po.documents.length})</div>
+            {po.documents.map((d, i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 12px", borderRadius:6, fontSize:11, color:COLORS.textDim }}>
+                <span>📄</span> {d.name} <span style={{ color:COLORS.textDim }}>({d.type})</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${COLORS.border}`, background:"transparent", color:COLORS.textMuted, cursor:"pointer", fontSize:13 }}>Fermer</button>
+          {files.length > 0 && <button onClick={handleAttach}
+            style={{ padding:"8px 20px", borderRadius:8, border:"none", background:`linear-gradient(135deg, ${COLORS.accent}, #059669)`, color:"white", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+            Joindre {files.length} document{files.length > 1 ? "s" : ""}
+          </button>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── LOGIN PAGE ──────────────────────────────────────────────────────────────
 const LoginPage = ({ onLogin }) => {
   const [isDark] = useState(true);
@@ -2417,7 +3114,7 @@ const WarehouseDashboard = () => {
   const toggleTask = (id) => setDailyTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
 
   const myPOs = pos.filter(p => p.statut === "ENVOYE");
-  const myCountsToday = counts.filter(c => c.compteur === auth.user.nom && c.date >= "2026-03-14").length;
+  const myCountsToday = counts.filter(c => c.compteur === auth.user.nom && c.date >= TODAY).length;
   const tasksCompleted = myTasks.filter(t => t.done).length;
   const priorityColors = { Haute: COLORS.danger, Moyenne: COLORS.warning, Basse: COLORS.info };
   const myActivity = activityLog.filter(a => a.user === auth.user.nom).slice(0, 8);
@@ -2427,7 +3124,7 @@ const WarehouseDashboard = () => {
       {/* Welcome */}
       <div style={{ background:`linear-gradient(135deg, ${COLORS.accent}15, ${COLORS.info}10)`, borderRadius:16, padding:"24px 28px", border:`1px solid ${COLORS.border}` }}>
         <div style={{ fontSize:22, fontWeight:700, color:COLORS.text, marginBottom:4 }}>Bonjour, {auth.user.nom.split(' ')[0]} 👋</div>
-        <div style={{ fontSize:13, color:COLORS.textMuted }}>{auth.user.poste} — 18 mars 2026</div>
+        <div style={{ fontSize:13, color:COLORS.textMuted }}>{auth.user.poste} — {TODAY_DISPLAY}</div>
         {tasksCompleted === myTasks.length && myTasks.length > 0 && (
           <div style={{ marginTop:8, padding:"4px 14px", borderRadius:20, fontSize:11, fontWeight:600, background:`${COLORS.accent}20`, color:COLORS.accent, display:"inline-block" }}>🎉 Toutes les tâches complétées !</div>
         )}
@@ -2522,15 +3219,20 @@ const WarehouseDashboard = () => {
 // ─── WAREHOUSE ORDERS PAGE ───────────────────────────────────────────────────
 const WarehouseOrdersPage = () => {
   const COLORS = useTheme();
-  const { pos, addEvent, showToast, setPos, setTasks, tasks, completeDailyTask, addNotification, addActivity } = useData();
+  const { pos, addEvent, showToast, setPos, setTasks, tasks, completeDailyTask, addNotification, addActivity, setSlideOver } = useData();
   const auth = useAuth();
   const [filter, setFilter] = useState("ENVOYE");
   const [search, setSearch] = useState("");
-  const [receptionModal, setReceptionModal] = useState(null); // PO object
+  const [receptionModal, setReceptionModal] = useState(null);
   const [receptionForm, setReceptionForm] = useState({ qtyRecue:"", probleme:null, note:"" });
-  const [pickingModal, setPickingModal] = useState(null); // PO object
+  const [pickingModal, setPickingModal] = useState(null);
   const [pickingLines, setPickingLines] = useState([]);
-  const [rangementModal, setRangementModal] = useState(null); // PO object
+  const [rangementModal, setRangementModal] = useState(null);
+  const { sortCol, sortDir, handleSort, sortData } = useSortable("po_number","asc");
+  const S = ({ col, children, tip }) => <SortableTh col={col} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} tip={tip}>{children}</SortableTh>;
+
+  const WAREHOUSE_WORKERS = USERS.filter(u => u.role === "entrepot").map(u => u.nom);
+  const assignRandom = () => WAREHOUSE_WORKERS[Math.floor(Math.random() * WAREHOUSE_WORKERS.length)];
 
   const PROBLEMES = ["Aucun — conforme","Colis endommagé","Quantité manquante","Mauvais article reçu","Article défectueux","Documentation manquante"];
 
@@ -2543,18 +3245,18 @@ const WarehouseOrdersPage = () => {
       const s = search.toLowerCase();
       filtered = filtered.filter(p => p.po_number.toLowerCase().includes(s) || p.article.toLowerCase().includes(s) || p.sku.toLowerCase().includes(s));
     }
-    return filtered;
-  }, [pos, filter, search]);
+    return sortData(filtered);
+  }, [pos, filter, search, sortCol, sortDir]);
 
   // Calculate days since sent for urgency
   const daysSinceSent = (po) => {
     if (!po.date_envoi) return 0;
     const sent = new Date(po.date_envoi);
-    const now = new Date("2026-03-18");
+    const now = new Date(TODAY);
     return Math.floor((now - sent) / (1000*60*60*24));
   };
 
-  const todayActions = pos.filter(p => p.received_by === auth.user.nom && p.date_reception === "2026-03-18").length;
+  const todayActions = pos.filter(p => p.received_by === auth.user.nom && p.date_reception === TODAY).length;
 
   // ─── RÉCEPTION ─────────────────────────────────
   const handleOpenReception = (po) => {
@@ -2572,7 +3274,7 @@ const WarehouseOrdersPage = () => {
 
     // Update PO: ENVOYE → RECU
     setPos(prev => prev.map(p => p.po_id === po.po_id ? {
-      ...p, statut: "RECU", date_reception: "2026-03-18",
+      ...p, statut: "RECU", date_reception: TODAY,
       qty_recue: qtyRecue,
       prix_paye: +(p.prix_negocie * (0.97 + Math.random() * 0.06)).toFixed(2),
       received_by: auth.user.nom,
@@ -2634,7 +3336,7 @@ const WarehouseOrdersPage = () => {
 
     // Update PO with picking info
     setPos(prev => prev.map(p => p.po_id === po.po_id ? {
-      ...p, picking_done: true, picking_by: auth.user.nom, picking_date: "2026-03-18",
+      ...p, picking_done: true, picking_by: auth.user.nom, picking_date: TODAY,
     } : p));
 
     addEvent("WAREHOUSE_PICKING", "PurchaseOrder", po.po_id,
@@ -2674,7 +3376,7 @@ const WarehouseOrdersPage = () => {
 
     // Mark PO as ranged
     setPos(prev => prev.map(p => p.po_id === po.po_id ? {
-      ...p, rangement_done: true, rangement_by: auth.user.nom, rangement_date: "2026-03-18",
+      ...p, rangement_done: true, rangement_by: auth.user.nom, rangement_date: TODAY,
     } : p));
 
     addEvent("WAREHOUSE_RANGEMENT", "PurchaseOrder", po.po_id,
@@ -2695,7 +3397,7 @@ const WarehouseOrdersPage = () => {
         <KpiCard label="À réceptionner" value={pos.filter(p=>p.statut==="ENVOYE").length} color={COLORS.info}/>
         <KpiCard label="À ranger" value={pos.filter(p=>p.statut==="RECU" && !p.rangement_done).length} color={COLORS.warning}/>
         <KpiCard label="Picking à faire" value={pos.filter(p=>p.statut==="ENVOYE" && !p.picking_done).length} color={COLORS.purple}/>
-        <KpiCard label="Traités aujourd'hui" value={todayActions} sub="18 mars 2026" color={COLORS.accent}/>
+        <KpiCard label="Traités aujourd'hui" value={todayActions} sub={TODAY_DISPLAY} color={COLORS.accent}/>
         <KpiCard label="En retard (>7j)" value={pos.filter(p=>p.statut==="ENVOYE"&&daysSinceSent(p)>7).length} color={pos.filter(p=>p.statut==="ENVOYE"&&daysSinceSent(p)>7).length>0?COLORS.danger:COLORS.textDim}/>
       </div>
 
@@ -2720,13 +3422,15 @@ const WarehouseOrdersPage = () => {
       {/* Table */}
       <Card title={`Commandes internes — ${warehousePOs.length}`}>
         <TableContainer>
-          <thead><tr><Th>PO #</Th><Th>Article</Th><Th>SKU</Th><Th>Qty</Th><Th>Fournisseur</Th><Th>Statut</Th><Th>Envoyé</Th><Th>Urgence</Th><Th>Actions</Th></tr></thead>
+          <thead><tr><S col="po_number">PO #</S><S col="article">Article</S><S col="sku">SKU</S><S col="qty">Qty</S><S col="supplier_id">Fournisseur</S><S col="statut">Statut</S><Th>Assigné</Th><S col="date_envoi">Envoyé</S><Th>Urgence</Th><Th>Actions</Th></tr></thead>
           <tbody>
             {warehousePOs.map(po => {
               const days = daysSinceSent(po);
               const urgent = po.statut === "ENVOYE" && days > 7;
+              if (!po.assigned_worker && po.statut === "ENVOYE") { po.assigned_worker = assignRandom(); }
               return (
-                <tr key={po.po_id} style={{ background: urgent ? `${COLORS.danger}08` : "transparent" }}
+                <tr key={po.po_id} style={{ background: urgent ? `${COLORS.danger}08` : "transparent", cursor:"pointer" }}
+                  onClick={()=>setSlideOver({data:po,type:"po"})}
                   onMouseEnter={e=>e.currentTarget.style.background=urgent?`${COLORS.danger}12`:COLORS.cardHover}
                   onMouseLeave={e=>e.currentTarget.style.background=urgent?`${COLORS.danger}08`:"transparent"}>
                   <Td style={{ fontWeight:700, color:COLORS.accent }}>{po.po_number}</Td>
@@ -2735,12 +3439,13 @@ const WarehouseOrdersPage = () => {
                   <Td style={{ fontWeight:600 }}>{po.qty_recue ? `${po.qty_recue}/${po.qty}` : po.qty}</Td>
                   <Td style={{ color:COLORS.textMuted, fontSize:12 }}>{SUPPLIER_MAP[po.supplier_id]?.split(' ')[0]}</Td>
                   <Td><Badge>{po.statut}</Badge></Td>
+                  <Td style={{ fontSize:11, color:COLORS.info }}>{po.assigned_worker || "—"}</Td>
                   <Td style={{ color:COLORS.textDim, fontSize:12 }}>{po.date_envoi || "—"}</Td>
                   <Td>
                     {urgent && <span style={{ padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:700, background:`${COLORS.danger}20`, color:COLORS.danger, animation:"pulse 1.5s infinite" }}>⚠ {days}j</span>}
                     {!urgent && po.statut === "ENVOYE" && days > 0 && <span style={{ fontSize:11, color:COLORS.textDim }}>{days}j</span>}
                   </Td>
-                  <Td>
+                  <Td onClick={e=>e.stopPropagation()}>
                     <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
                       {po.statut === "ENVOYE" && <>
                         <button onClick={()=>handleOpenReception(po)} style={{ padding:"4px 10px", borderRadius:6, border:`1px solid ${COLORS.accent}`, background:COLORS.accentGlow, color:COLORS.accent, fontSize:10, fontWeight:600, cursor:"pointer" }}>📦 Réceptionner</button>
@@ -3247,9 +3952,9 @@ export default function App() {
     setDailyTasks(prev => prev.map(t => {
       if (t.done) return t;
       // Match by PO reference AND action type
-      if (t.po_ref === poNumber && t.action_type === actionType) return { ...t, done: true, completed_at: "2026-03-18" };
+      if (t.po_ref === poNumber && t.action_type === actionType) return { ...t, done: true, completed_at: TODAY };
       // Match by action type alone for non-PO tasks (rangement generic, etc.)
-      if (!t.po_ref && t.action_type === actionType && t.assignee === currentUser?.nom) return { ...t, done: true, completed_at: "2026-03-18" };
+      if (!t.po_ref && t.action_type === actionType && t.assignee === currentUser?.nom) return { ...t, done: true, completed_at: TODAY };
       return t;
     }));
   }, [currentUser]);
@@ -3268,7 +3973,7 @@ export default function App() {
     const now = new Date();
     const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     setActivityLog(prev => [{
-      id: prev.length + 1, user: currentUser?.nom, role: currentUser?.role, action, details, time, date: "2026-03-18",
+      id: prev.length + 1, user: currentUser?.nom, role: currentUser?.role, action, details, time, date: TODAY,
     }, ...prev].slice(0, 100)); // Keep max 100
   }, [currentUser]);
 
@@ -3279,7 +3984,7 @@ export default function App() {
       if (!transition) return po;
       const oldStatut = po.statut;
       const newStatut = transition.next;
-      const now = "2026-03-14";
+      const now = TODAY;
       const updated = { ...po, statut: newStatut };
       // Track dates per transition step
       if (newStatut === "A_VALIDER") updated.date_validation = now;
@@ -3326,7 +4031,7 @@ export default function App() {
         // Create managerial approval task
         setTasks(prev => [{ task_id: prev.length+1, type:"Approbation managériale",
           related_po_id: poId, assigned_to:"Jean Dupont", status:"Ouverte",
-          due_at:"2026-03-17", comment:`Qty ${po.qty} > EOQ×2 pour ${po.po_number}` }, ...prev]);
+          due_at:daysFromNow(3), comment:`Qty ${po.qty} > EOQ×2 pour ${po.po_number}` }, ...prev]);
         showToast(`Qty > EOQ×2 — approbation managériale créée`, "error");
         // Still allow transition but with audit trail
       }
@@ -3370,7 +4075,7 @@ export default function App() {
       po_id: poId, po_number: poNumber, sku: item.sku, article: item.article,
       supplier_id: item.supplier_id, qty, statut: "BROUILLON",
       prix_negocie: +(item.cout_unitaire * 0.95).toFixed(2), prix_paye: null,
-      date_creation: "2026-03-14", date_validation: null, date_envoi: null, date_reception: null,
+      date_creation: TODAY, date_validation: null, date_envoi: null, date_reception: null,
       created_by: "Jean Dupont",
     };
     setPos(prev => [newPO, ...prev]);
@@ -3378,13 +4083,13 @@ export default function App() {
     // Status history: initial
     setStatusHistory(prev => [...prev, {
       id: prev.length+1, po_id: poId, old_status: null, new_status: "BROUILLON",
-      changed_by: "Jean Dupont", changed_at: "2026-03-14", comment: `PO créé — ${item.article}`,
+      changed_by: "Jean Dupont", changed_at: TODAY, comment: `PO créé — ${item.article}`,
     }]);
     // Create validation task
     const newTask = {
       task_id: tasks.length + 1, type: "Validation PO", related_po_id: poId,
       assigned_to: "Marie Lavoie", status: "Ouverte",
-      due_at: "2026-03-17", comment: `Validation ${poNumber} — ${item.article}`,
+      due_at: daysFromNow(3), comment: `Validation ${poNumber} — ${item.article}`,
     };
     setTasks(prev => [newTask, ...prev]);
     // Guard #2: qty > EOQ × 2 warning
@@ -3393,7 +4098,7 @@ export default function App() {
         `${poNumber} — Qty ${qty} > EOQ×2 (${Math.round(item.eoq*2)}) — tâche approbation créée`, "WARNING");
       setTasks(prev => [{ task_id: prev.length+1, type:"Approbation managériale",
         related_po_id: poId, assigned_to:"Jean Dupont", status:"Ouverte",
-        due_at:"2026-03-17", comment:`Qty > EOQ×2 pour ${poNumber}` }, ...prev]);
+        due_at:daysFromNow(3), comment:`Qty > EOQ×2 pour ${poNumber}` }, ...prev]);
     }
     addEvent("PO_CREATED", "PurchaseOrder", poId,
       `${poNumber} créé pour ${item.article} (${item.sku}) — qty: ${qty}`, "INFO");
@@ -3405,7 +4110,7 @@ export default function App() {
 
   const dataValue = useMemo(() => ({
     pos, tasks, events, statusHistory, counts, transitionPO, createPO, setActivePage, confirmAction,
-    setSlideOver, setExpandedKPI, setCounts, setTasks, addEvent, showToast, setPos,
+    setSlideOver, setExpandedKPI, setCounts, setTasks, addEvent, showToast, setPos, setEvents,
     dailyTasks, setDailyTasks, completeDailyTask, notifications, addNotification, activityLog, addActivity,
   }), [pos, tasks, events, statusHistory, counts, transitionPO, createPO, confirmAction, dailyTasks, notifications, activityLog]);
 
@@ -3519,7 +4224,7 @@ export default function App() {
         <header style={{ padding:"16px 28px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", background:COLORS.surface, flexShrink:0, transition:"background 0.35s, border-color 0.35s" }}>
           <div>
             <h1 style={{ fontSize:20, fontWeight:700, margin:0, letterSpacing:"-0.02em" }}>{PAGE_TITLES[activePage]}</h1>
-            <div style={{ fontSize:12, color:COLORS.textDim, marginTop:2, transition:"color 0.35s" }}>17 mars 2026 — Q1 2026 · <span style={{ opacity:0.5 }}>{APP_VERSION}</span></div>
+            <div style={{ fontSize:12, color:COLORS.textDim, marginTop:2, transition:"color 0.35s" }}>{TODAY_DISPLAY} — {QUARTER} · <span style={{ opacity:0.5 }}>{APP_VERSION}</span></div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <button onClick={()=>setGlobalSearch(true)} style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 14px", borderRadius:10, border:`1px solid ${COLORS.border}`, background:COLORS.surface, color:COLORS.textMuted, fontSize:12, cursor:"pointer", transition:"border-color 0.2s", minWidth:180, justifyContent:"space-between" }}
