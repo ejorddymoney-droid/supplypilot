@@ -1,158 +1,88 @@
-# SupplyPilot — Inventory & Procurement Management
+# SupplyPilot — pilotage des achats et des stocks
 
-Application métier complète de pilotage supply chain / approvisionnement, transformée à partir d'un modèle Excel de gestion d'inventaire EOQ/Pareto.
+Application web de gestion de la chaîne d'approvisionnement : inventaire, fournisseurs, commandes d'achat, règles de contrôle et journal d'audit. Projet d'équipe réalisé dans le cadre de l'AEC *IA pour la gestion des affaires* (Collège Cumberland, 2026).
 
-## Stack technique
+**Démo en ligne :** https://supplypilot-five.vercel.app/ (des comptes de démonstration sont indiqués sur la page de connexion)
+**Version actuelle :** 3.0.0 — voir le [CHANGELOG](CHANGELOG.md)
 
-| Couche | Technologies |
-|--------|-------------|
-| **Frontend** | React, TypeScript, Vite, Tailwind CSS, Recharts, shadcn/ui |
-| **Backend** | Python, FastAPI, SQLAlchemy, Pydantic, Alembic |
-| **Base de données** | PostgreSQL |
+## D'où vient le projet
 
-## Architecture
+1. **Modèle Excel** : un fichier de gestion d'inventaire (EOQ, point de commande, analyse ABC/Pareto).
+2. **Tableau de bord KPI d'inventaire** : le modèle Excel transformé en tableau de bord.
+3. **Application web** : le tableau de bord transformé en application complète, développée avec l'aide d'outils d'IA (ChatGPT et Claude) à partir d'un cahier des charges détaillé ([PROMPT_SupplyPilot_Frontend.md](PROMPT_SupplyPilot_Frontend.md)) : règles métier, cycle des commandes, KPI, formules et écrans.
+4. **Itérations** : 14 versions, de la 1.0.0 à la 3.0.0, chacune documentée dans le CHANGELOG.
 
-```
-inventory-procurement-app/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                  # FastAPI entry point
-│   │   ├── core/config.py           # Settings (env-based)
-│   │   ├── database/
-│   │   │   ├── session.py           # SQLAlchemy engine + session
-│   │   │   └── seed.py              # Demo data seeder
-│   │   ├── models/models.py         # SQLAlchemy ORM models
-│   │   ├── schemas/schemas.py       # Pydantic I/O schemas
-│   │   ├── api/routes/api.py        # REST API endpoints
-│   │   ├── services/services.py     # Business logic layer
-│   │   ├── rules_engine/engine.py   # Rules + guardrails
-│   │   └── audit/service.py         # Centralized event logging
-│   ├── .env
-│   └── requirements.txt
-├── frontend/
-│   └── src/
-│       ├── services/api.ts          # TypeScript API client
-│       └── ... (React components)
-├── database/
-│   └── schema.sql                   # PostgreSQL DDL
-└── README.md
-```
+## Ce que fait l'application
 
-## Installation
+- **Tableau de bord** : taux de service, couverture de stock, analyse ABC (Pareto), commandes à traiter.
+- **Inventaire** : 400 articles de démonstration, classement ABC, EOQ, point de commande, articles critiques.
+- **Fournisseurs** : fiches et statut (actif ou inactif).
+- **Commandes d'achat** : cycle complet BROUILLON → À VALIDER → ENVOYÉ → REÇU → CLOS.
+- **Tâches et journal d'audit** : chaque création, validation ou blocage est consigné avec l'utilisateur, le niveau et la raison.
+- **Entrepôt** : commandes internes, inventaire tournant, statistiques et performance TRS.
+- **Accès par rôle** : administrateur (gestionnaire des achats) et équipe d'entrepôt, chacun avec son propre menu.
 
-### Prérequis
+## Les 8 règles de contrôle
 
-- Python 3.11+
-- PostgreSQL 15+
-- Node.js 18+
-- npm ou pnpm
-
-### 1. Base de données PostgreSQL
-
-```bash
-# Créer l'utilisateur et la base
-sudo -u postgres psql -c "CREATE USER supplypilot WITH PASSWORD 'supplypilot';"
-sudo -u postgres psql -c "CREATE DATABASE supplypilot OWNER supplypilot;"
-
-# Appliquer le schéma
-psql -U supplypilot -d supplypilot -f database/schema.sql
-```
-
-### 2. Backend FastAPI
-
-```bash
-cd backend
-
-# Créer un virtualenv
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
-
-# Installer les dépendances
-pip install -r requirements.txt
-
-# Configurer l'environnement (modifier .env si nécessaire)
-cp .env.example .env  # ou éditer .env directement
-
-# Lancer le seed (données de démonstration)
-python -m app.database.seed
-
-# Lancer le serveur
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Le serveur démarre sur `http://localhost:8000`.
-- Documentation Swagger: `http://localhost:8000/docs`
-- Documentation ReDoc: `http://localhost:8000/redoc`
-
-### 3. Frontend React
-
-```bash
-cd frontend
-
-# Installer les dépendances
-npm install
-
-# Configurer l'URL de l'API (optionnel, défaut: http://localhost:8000/api)
-echo "VITE_API_URL=http://localhost:8000/api" > .env
-
-# Lancer le serveur de dev
-npm run dev
-```
-
-Le frontend démarre sur `http://localhost:5173`.
-
-## API Endpoints
-
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| GET | `/api/items` | Liste des articles (filtres: abc, famille, search) |
-| GET | `/api/items/critical` | Articles critiques uniquement |
-| GET | `/api/items/{id}` | Détail d'un article |
-| POST | `/api/items` | Créer un article |
-| PATCH | `/api/items/{id}` | Modifier un article (recalcul EOQ auto) |
-| GET | `/api/suppliers` | Liste des fournisseurs |
-| GET | `/api/suppliers/{id}` | Détail fournisseur |
-| GET | `/api/purchase-orders` | Liste des POs (filtres: statut, search) |
-| POST | `/api/purchase-orders` | Créer un PO (garde-fous actifs) |
-| POST | `/api/purchase-orders/{id}/approve` | Valider (BROUILLON → A_VALIDER) |
-| POST | `/api/purchase-orders/{id}/send` | Envoyer (A_VALIDER → ENVOYE) |
-| POST | `/api/purchase-orders/{id}/receive` | Réceptionner (ENVOYE → RECU) |
-| POST | `/api/purchase-orders/{id}/close` | Clore (RECU → CLOS) |
-| GET | `/api/purchase-orders/{id}/history` | Historique des transitions |
-| GET | `/api/tasks` | Liste des tâches (filtre: status) |
-| GET | `/api/event-log` | Journal d'audit (filtre: level) |
-| GET | `/api/dashboard/summary` | KPIs consolidés |
-| POST | `/api/rules/run-replenishment-check` | Lancer le scan de réapprovisionnement |
-
-## Règles métier (Rules Engine)
-
-| # | Règle | Résultat |
-|---|-------|---------|
-| 1 | Un seul PO BROUILLON/A_VALIDER par SKU | Création bloquée + log WARNING |
-| 2 | Qty > EOQ × 2 | Tâche approbation managériale + log WARNING |
-| 3 | Fournisseur inactif | Création PO bloquée + log ERROR |
-| 4 | Qty <= 0 | Refus + log ERROR |
-| 5 | Envoi sans validation | Transition bloquée + log ERROR |
-| 6 | Réception sans envoi | Transition bloquée + log ERROR |
-| 7 | PO clos → modification | Bloqué + log ERROR |
+| # | Règle | Condition | Action |
+|---|-------|-----------|--------|
+| 1 | Réapprovisionnement automatique | Classe A ou B, stock sous le seuil, fournisseur actif | Commande brouillon + tâche de validation + journal |
+| 2 | Une seule commande ouverte par article | Déjà une commande BROUILLON ou À VALIDER pour ce SKU | Création bloquée + avertissement |
+| 3 | Limite de quantité | Quantité > EOQ × 2 | Validation par un gestionnaire |
+| 4 | Fournisseur inactif | Fournisseur au statut inactif | Création bloquée + erreur |
+| 5 | Quantité positive | Quantité ≤ 0 | Commande refusée |
+| 6 | Envoi sans validation | Commande non validée | Transition bloquée |
+| 7 | Réception sans envoi | Commande non envoyée | Transition bloquée |
+| 8 | Commande close immuable | Modification d'une commande CLOSE | Modification bloquée |
 
 ## Formules
 
 - **EOQ** = √((2 × D × S) / H)
-- **ROP** = (D/365 × Lead time) + Stock sécurité
-- **Couverture** = Stock net / (D / 365)
-- **Classification ABC** = Pareto sur valeur annuelle (A ≤ 80%, B ≤ 95%, C > 95%)
+- **Point de commande** = (D / 365 × délai de livraison) + stock de sécurité
+- **Couverture** = stock net / (D / 365)
+- **Classe ABC** (Pareto sur la valeur annuelle) : A ≤ 80 %, B ≤ 95 %, C > 95 %
 
-## Données seed
+## Technologies
 
-Le script `seed.py` génère:
-- 5 fournisseurs (dont 1 inactif)
-- 400 articles avec classification ABC automatique
-- 20 POs dans différents statuts
-- 12 tâches de validation
-- 30 événements d'audit
+| Élément | Choix |
+|---------|-------|
+| Interface | React 18 (JavaScript, composants fonctionnels et hooks) |
+| Graphiques | Recharts |
+| Outil de build | Vite 5 |
+| État | React Context (données, authentification, thème) |
+| Styles | Styles en ligne et jetons de design (`src/styles`) |
+| Données | Générées dans le navigateur au démarrage (`src/data/generators.js`) : aucune base de données ni serveur requis |
+| Hébergement | Vercel |
+
+> Une version avec serveur (FastAPI, PostgreSQL) a été prototypée à la version 1.7.0 (voir le CHANGELOG). Elle ne fait pas partie de ce dépôt : la version en ligne fonctionne entièrement dans le navigateur.
+
+## Structure
+
+```
+src/
+├── App.jsx                  # Navigation, workflow des commandes
+├── components/
+│   ├── pages/               # Un fichier par écran (tableau de bord, inventaire, commandes…)
+│   ├── layout/              # Barre latérale et en-tête
+│   ├── overlays/            # Fenêtres, recherche globale, notifications
+│   └── common/              # Cartes, tableaux, badges, boutons
+├── contexts/                # Données, authentification, thème
+├── data/                    # Constantes et génération des données de démonstration
+├── hooks/                   # Tri des tableaux
+├── styles/                  # Jetons de design et thèmes
+└── utils/                   # Formatage, export CSV
+```
+
+## Lancer le projet en local
+
+Prérequis : Node.js 18 ou plus récent.
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # version de production dans dist/
+```
 
 ## Licence
 
-Propriétaire — usage interne uniquement.
+Projet scolaire. Tous droits réservés.
